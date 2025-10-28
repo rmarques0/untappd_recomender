@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<script src="https://cdn.tailwindcss.com"></script>
+	<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+	<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+	<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+
+	<title>Recomendaciones para {{ user_id }}</title>
+</head>
+
+<body class="px-6 py-4 bg-amber-50">
+	<!-- Onboarding para primera visita -->
+	{% if first_visit %}
+	<div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+		<div class="flex items-start space-x-4">
+			<div class="flex-1">
+				<h3 class="text-lg font-bold text-blue-800 mb-2">¡Bienvenido al sistema de recomendaciones!</h3>
+				<div class="text-blue-700 space-y-2">
+					<p><strong>¿Cómo funciona?</strong></p>
+					<ul class="list-disc list-inside space-y-1 ml-4">
+						<li>Evalúa las cervezas que aparecen abajo (0.5 a 5.0 estrellas)</li>
+						<li>El sistema evoluciona: Popular → Híbrido → Colaborativo</li>
+						<li>Con 5+ evaluaciones, encuentra usuarios con gustos similares</li>
+						<li>Puedes hacer clic en cualquier cerveza para ver más detalles</li>
+					</ul>
+					<p class="mt-3"><strong>💡 Tip:</strong> Evalúa al menos 10 cervezas para activar el filtrado colaborativo completo.</p>
+				</div>
+			</div>
+		</div>
+	</div>
+	{% endif %}
+
+	<div class="flex justify-between items-center mb-6">
+		<div>
+			<h1 class="text-2xl font-bold text-amber-800">Recomendaciones para {{ user_id }}</h1>
+			<p class="text-amber-600">Descubre nuevas cervezas argentinas</p>
+		</div>
+		<div class="flex space-x-2">
+			<a href="/buscar" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				🔍 Buscar
+			</a>
+			<a href="/historial" class="bg-green-500 hover:bg-green-600 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				📊 Historial
+			</a>
+			<a href="/perfil" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				👤 Perfil
+			</a>
+			{% if user_id == 'rmarques' %}
+			<a href="/admin" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				⚙️ Admin
+			</a>
+			{% endif %}
+			<a href="/reset" class="bg-red-500 hover:bg-red-600 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				🔄 Reset
+			</a>
+		</div>
+	</div>
+
+	<!-- Métricas de progreso -->
+	<div class="bg-white rounded-lg shadow-lg p-4 mb-6">
+		<div class="flex justify-between items-center">
+			<div class="text-sm text-gray-600">
+				<strong>Progreso:</strong> {{ cant_vistas }} vistas, {{ cant_valoradas }} valoradas
+			</div>
+			{% if cant_valoradas > 0 %}
+			<div class="text-sm text-amber-600">
+				<strong>Sistema de recomendación:</strong> 
+				{% if cant_valoradas == 0 %}
+					Popular (cervezas más valoradas)
+				{% elif cant_valoradas < 10 %}
+					Híbrido (popular + colaborativo)
+				{% else %}
+					Colaborativo (basado en usuarios similares)
+				{% endif %}
+			</div>
+			{% endif %}
+		</div>
+	</div>
+
+	<form method="post" action="/recomendaciones">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+			{% for cerveza in cervezas_recomendadas %}
+			<div class="card bg-white shadow-lg border border-amber-200 rounded-lg overflow-hidden">
+				<div class="flex">
+					{% if cerveza.image_url %}
+					<img src="{{ cerveza.image_url }}" class="w-24 h-32 object-cover" alt="{{ cerveza.beer_name }}" />
+					{% else %}
+					<div class="w-24 h-32 bg-amber-100 flex items-center justify-center">
+						<span class="text-2xl">🍺</span>
+					</div>
+					{% endif %}
+
+					<div class="card-body p-4 flex-1">
+						<h2 class="card-title text-lg font-semibold text-amber-800 mb-2">
+							<a href="/cerveza/{{cerveza.beer_id}}" class="hover:text-amber-600 transition-colors">
+								{{ cerveza.beer_name|title }}
+							</a>
+						</h2>
+						
+						<div class="text-sm text-gray-600 mb-2">
+							<span class="font-medium">{{ cerveza.brewery_name|title }}</span>
+							{% if cerveza.style %}
+							<br><span class="text-amber-600">{{ cerveza.style }}</span>
+							{% endif %}
+						</div>
+
+						<div class="flex justify-between text-xs text-gray-500 mb-3">
+							{% if cerveza.abv and cerveza.abv != '0' %}
+							<span>ABV: {{ cerveza.abv }}%</span>
+							{% endif %}
+							{% if cerveza.ibu and cerveza.ibu != '0' %}
+							<span>IBU: {{ cerveza.ibu }}</span>
+							{% endif %}
+							{% if cerveza.rating and cerveza.rating != '0' %}
+							<span>⭐ {{ cerveza.rating }}</span>
+							{% endif %}
+						</div>
+
+						<div class="card-actions justify-end items-center mt-auto">
+							<div class="flex items-center">
+								<label for="{{cerveza.beer_id}}" class="text-sm text-gray-700 mr-2">Mi puntuación:</label>
+								<select name="{{cerveza.beer_id}}" aria-label="Puntuación para {{ cerveza.beer_name }}" class="px-3 py-1 text-sm border border-amber-300 rounded focus:ring-amber-500 focus:border-amber-500">
+									<option value="0" selected>Sin puntuar</option>
+									<option value="0.5">0.5</option>
+									<option value="1">1</option>
+									<option value="1.5">1.5</option>
+									<option value="2">2</option>
+									<option value="2.5">2.5</option>
+									<option value="3">3</option>
+									<option value="3.5">3.5</option>
+									<option value="4">4</option>
+									<option value="4.5">4.5</option>
+									<option value="5">5</option>
+								</select>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			{% endfor %}
+		</div>
+
+		<div class="flex justify-center mt-8">
+			<input type="submit" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-8 py-3 rounded-lg cursor-pointer transition-colors text-lg" 
+				value="Guardar Evaluaciones y Obtener Nuevas Recomendaciones">
+		</div>
+	</form>
+</body>
+
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Untappd Recomendador</title>
+</head>
+
+<body class="px-12 py-4 bg-amber-50">
+    <div class="text-center mb-6">
+        <h1 class="text-3xl font-bold text-amber-800">Recomendador Cervezas</h1>
+        <p class="text-amber-600">Descubre nuevas cervezas argentinas</p>
+    </div>
+    
+    <form method="post" class="w-96 border shadow-xl mx-auto mt-7 p-6 bg-white rounded-lg">
+        <h2 class="mb-4 text-xl font-bold text-amber-800">Entrar al sistema</h2>
+        <div class="flex mb-4">
+            <label class="block w-full">
+                <span class="text-gray-700">Usuario:</span>
+                <input type="text" name="user_id" minlength="3" maxlength="30" required 
+                       class="mt-1 block w-full p-2 border rounded-md focus:ring-amber-500 focus:border-amber-500" 
+                       placeholder="Ingresa tu usuario" />
+            </label>
+        </div>
+
+        <!--
+        <div class="flex mb-4">
+            <label>
+                Nombre: <input type="text" name="nombre" minlength="3" maxlength="30" required class="p-1 border rounded">
+            </label>
+        </div>
+        <div class="flex mb-4">
+            <label>
+                Género:
+                <select name="genero" class="p-1 border rounded">
+                    <option value="" selected></option>
+                    <option value="Hombre">Masculino</option>
+                    <option value="Femenino">Femenino</option>
+                </select>
+            </label>
+        </div>
+        <div class="flex mb-4">
+            <label>
+                Vive en: <input type="text" name="vive_en" minlength="3" maxlength="30" class="p-1 border rounded">
+            </label>
+        </div>
+        <div class="flex mb-4">
+            <label>
+                Año de nacimiento: <input type="text" name="nacimiento" pattern="[0-9]{4}" maxlength="4" class="p-1 border rounded">
+            </label>
+        </div> -->
+
+        <div class="flex justify-end">
+            <button type="submit"
+                class="bg-amber-600 hover:bg-amber-700 text-white text-lg font-bold px-6 py-2 rounded-md transition-colors">
+                Descubrir Cervezas
+            </button>
+        </div>
+    </form>
+</body>
+
+</html>

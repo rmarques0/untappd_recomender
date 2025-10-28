@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<script src="https://cdn.tailwindcss.com"></script>
+	<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+	<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+	<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+
+	<title>Mi Historial - {{ user_id }}</title>
+</head>
+
+<body class="px-6 py-4 bg-amber-50">
+	<!-- Navegación -->
+	<div class="flex justify-between items-center mb-6">
+		<div class="flex items-center space-x-4">
+			<a href="/recomendaciones" class="text-amber-600 hover:text-amber-800 transition-colors">
+				← Volver a Recomendaciones
+			</a>
+			<h1 class="text-2xl font-bold text-amber-800">Mi Historial</h1>
+		</div>
+		<div class="flex space-x-2">
+			<a href="/buscar" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				🔍 Buscar
+			</a>
+			<a href="/perfil" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				👤 Perfil
+			</a>
+			{% if user_id == 'rmarques' %}
+			<a href="/admin" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				⚙️ Admin
+			</a>
+			{% endif %}
+		</div>
+	</div>
+
+	<!-- Estadísticas rápidas -->
+	<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div class="text-center">
+				<div class="text-2xl font-bold text-amber-800">{{ cant_valoradas }}</div>
+				<div class="text-sm text-gray-600">Cervezas valoradas</div>
+			</div>
+			<div class="text-center">
+				<div class="text-2xl font-bold text-amber-800">{{ cant_vistas }}</div>
+				<div class="text-sm text-gray-600">Cervezas vistas</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Lista de evaluaciones -->
+	{% if evaluaciones %}
+	<div class="bg-white rounded-lg shadow-lg p-6">
+		<h2 class="text-xl font-bold text-amber-800 mb-4">Mis Evaluaciones</h2>
+		<div class="space-y-4">
+			{% for evaluacion in evaluaciones %}
+			<div class="flex items-center space-x-4 p-4 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors">
+				<!-- Imagen placeholder -->
+				<div class="w-16 h-20 bg-amber-200 flex items-center justify-center rounded">
+					<span class="text-2xl">🍺</span>
+				</div>
+
+				<!-- Información de la cerveza -->
+				<div class="flex-1">
+					<h3 class="font-semibold text-amber-800">
+						<a href="/cerveza/{{evaluacion.beer_id}}" class="hover:text-amber-600 transition-colors">
+							{{ evaluacion.beer_name|title }}
+						</a>
+					</h3>
+					<p class="text-sm text-gray-600">{{ evaluacion.brewery_name|title }}</p>
+					{% if evaluacion.style %}
+					<p class="text-xs text-amber-600">{{ evaluacion.style }}</p>
+					{% endif %}
+					{% if evaluacion.abv and evaluacion.abv != '0' %}
+					<p class="text-xs text-gray-500">ABV: {{ evaluacion.abv }}%</p>
+					{% endif %}
+				</div>
+
+				<!-- Rating del usuario -->
+				<div class="text-center">
+					<div class="text-2xl font-bold text-amber-800">⭐ {{ evaluacion.rating }}</div>
+					<div class="text-xs text-gray-500">
+						{{ evaluacion.fecha[:10] if evaluacion.fecha else 'Fecha no disponible' }}
+					</div>
+				</div>
+			</div>
+			{% endfor %}
+		</div>
+	</div>
+	{% else %}
+	<div class="bg-white rounded-lg shadow-lg p-6 text-center">
+		<div class="text-gray-500 mb-4">
+			<span class="text-4xl">📊</span>
+		</div>
+		<h3 class="text-lg font-semibold text-gray-700 mb-2">Aún no has evaluado cervezas</h3>
+		<p class="text-gray-500 mb-4">Comienza evaluando algunas cervezas para ver tu historial aquí</p>
+		<a href="/recomendaciones" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
+			Ver Recomendaciones
+		</a>
+	</div>
+	{% endif %}
+</body>
+
+</html>

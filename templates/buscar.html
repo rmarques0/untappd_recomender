@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<script src="https://cdn.tailwindcss.com"></script>
+	<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+	<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+	<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+
+	<title>Buscar Cervezas</title>
+</head>
+
+<body class="px-6 py-4 bg-amber-50">
+	<!-- Navegación -->
+	<div class="flex justify-between items-center mb-6">
+		<div class="flex items-center space-x-4">
+			<a href="/recomendaciones" class="text-amber-600 hover:text-amber-800 transition-colors">
+				← Volver a Recomendaciones
+			</a>
+			<h1 class="text-2xl font-bold text-amber-800">Buscar Cervezas</h1>
+		</div>
+		<div class="flex space-x-2">
+			<a href="/historial" class="bg-green-500 hover:bg-green-600 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				📊 Historial
+			</a>
+			<a href="/perfil" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				👤 Perfil
+			</a>
+			{% if user_id == 'rmarques' %}
+			<a href="/admin" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold text-xs px-3 py-1 rounded cursor-pointer transition-colors">
+				⚙️ Admin
+			</a>
+			{% endif %}
+		</div>
+	</div>
+
+	<!-- Formulario de búsqueda y filtros -->
+	<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+		<form method="get" action="/buscar" class="space-y-4">
+			<!-- Búsqueda por texto -->
+			<div>
+				<label for="q" class="block text-sm font-medium text-gray-700 mb-2">Buscar por nombre o cervecería</label>
+				<input type="text" id="q" name="q" value="{{ query }}" 
+					   placeholder="Ej: IPA, Quilmes, Patagonia..."
+					   class="w-full px-4 py-2 border border-amber-300 rounded-lg focus:ring-amber-500 focus:border-amber-500">
+			</div>
+
+			<!-- Filtros -->
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+				<!-- Estilo -->
+				<div>
+					<label for="estilo" class="block text-sm font-medium text-gray-700 mb-2">Estilo</label>
+					<select id="estilo" name="estilo" class="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-amber-500 focus:border-amber-500">
+						<option value="">Todos los estilos</option>
+						{% for estilo_option in estilos %}
+						<option value="{{ estilo_option }}" {% if estilo == estilo_option %}selected{% endif %}>{{ estilo_option }}</option>
+						{% endfor %}
+					</select>
+				</div>
+
+				<!-- Cervecería -->
+				<div>
+					<label for="cerveceria" class="block text-sm font-medium text-gray-700 mb-2">Cervecería</label>
+					<select id="cerveceria" name="cerveceria" class="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-amber-500 focus:border-amber-500">
+						<option value="">Todas las cervecerías</option>
+						{% for cerveceria_option in cervecerias %}
+						<option value="{{ cerveceria_option }}" {% if cerveceria == cerveceria_option %}selected{% endif %}>{{ cerveceria_option }}</option>
+						{% endfor %}
+					</select>
+				</div>
+
+				<!-- ABV Mínimo -->
+				<div>
+					<label for="abv_min" class="block text-sm font-medium text-gray-700 mb-2">ABV Mínimo (%)</label>
+					<input type="number" id="abv_min" name="abv_min" value="{{ abv_min }}" 
+						   min="0" max="20" step="0.1"
+						   placeholder="0.0"
+						   class="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-amber-500 focus:border-amber-500">
+				</div>
+
+				<!-- ABV Máximo -->
+				<div>
+					<label for="abv_max" class="block text-sm font-medium text-gray-700 mb-2">ABV Máximo (%)</label>
+					<input type="number" id="abv_max" name="abv_max" value="{{ abv_max }}" 
+						   min="0" max="20" step="0.1"
+						   placeholder="20.0"
+						   class="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-amber-500 focus:border-amber-500">
+				</div>
+			</div>
+
+			<!-- Botones -->
+			<div class="flex justify-between">
+				<button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-6 py-2 rounded-lg transition-colors">
+					🔍 Buscar
+				</button>
+				<a href="/buscar" class="bg-gray-500 hover:bg-gray-600 text-white font-semibold px-6 py-2 rounded-lg transition-colors">
+					Limpiar Filtros
+				</a>
+			</div>
+		</form>
+	</div>
+
+	<!-- Resultados -->
+	{% if cervezas %}
+	<div class="bg-white rounded-lg shadow-lg p-6">
+		<div class="flex justify-between items-center mb-4">
+			<h2 class="text-xl font-bold text-amber-800">
+				Resultados ({{ cervezas|length }} cervezas encontradas)
+			</h2>
+			{% if query or estilo or cerveceria or abv_min or abv_max %}
+			<div class="text-sm text-gray-600">
+				Filtros activos:
+				{% if query %}<span class="bg-amber-100 px-2 py-1 rounded mx-1">{{ query }}</span>{% endif %}
+				{% if estilo %}<span class="bg-amber-100 px-2 py-1 rounded mx-1">{{ estilo }}</span>{% endif %}
+				{% if cerveceria %}<span class="bg-amber-100 px-2 py-1 rounded mx-1">{{ cerveceria }}</span>{% endif %}
+				{% if abv_min %}<span class="bg-amber-100 px-2 py-1 rounded mx-1">ABV ≥ {{ abv_min }}%</span>{% endif %}
+				{% if abv_max %}<span class="bg-amber-100 px-2 py-1 rounded mx-1">ABV ≤ {{ abv_max }}%</span>{% endif %}
+			</div>
+			{% endif %}
+		</div>
+
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+			{% for cerveza in cervezas %}
+			<div class="card bg-amber-50 border border-amber-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
+				<div class="flex">
+					{% if cerveza.image_url %}
+					<img src="{{ cerveza.image_url }}" class="w-24 h-32 object-cover" alt="{{ cerveza.beer_name }}" />
+					{% else %}
+					<div class="w-24 h-32 bg-amber-100 flex items-center justify-center">
+						<span class="text-2xl">🍺</span>
+					</div>
+					{% endif %}
+
+					<div class="card-body p-4 flex-1">
+						<h3 class="card-title text-lg font-semibold text-amber-800 mb-2">
+							<a href="/cerveza/{{cerveza.beer_id}}" class="hover:text-amber-600 transition-colors">
+								{{ cerveza.beer_name|title }}
+							</a>
+						</h3>
+						
+						<div class="text-sm text-gray-600 mb-2">
+							<span class="font-medium">{{ cerveza.brewery_name|title }}</span>
+							{% if cerveza.style %}
+							<br><span class="text-amber-600">{{ cerveza.style }}</span>
+							{% endif %}
+						</div>
+
+						<div class="flex justify-between text-xs text-gray-500 mb-3">
+							{% if cerveza.abv and cerveza.abv != '0' %}
+							<span>ABV: {{ cerveza.abv }}%</span>
+							{% endif %}
+							{% if cerveza.ibu and cerveza.ibu != '0' %}
+							<span>IBU: {{ cerveza.ibu }}</span>
+							{% endif %}
+							{% if cerveza.rating and cerveza.rating != '0' %}
+							<span>⭐ {{ cerveza.rating }}</span>
+							{% endif %}
+						</div>
+
+						{% if cerveza.total_ratings %}
+						<div class="text-xs text-gray-500">
+							{{ cerveza.total_ratings }} evaluaciones
+						</div>
+						{% endif %}
+					</div>
+				</div>
+			</div>
+			{% endfor %}
+		</div>
+	</div>
+	{% elif query or estilo or cerveceria or abv_min or abv_max %}
+	<div class="bg-white rounded-lg shadow-lg p-6 text-center">
+		<div class="text-gray-500 mb-4">
+			<span class="text-4xl">🔍</span>
+		</div>
+		<h3 class="text-lg font-semibold text-gray-700 mb-2">No se encontraron cervezas</h3>
+		<p class="text-gray-500 mb-4">Intenta ajustar los filtros de búsqueda</p>
+		<a href="/buscar" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
+			Limpiar Filtros
+		</a>
+	</div>
+	{% else %}
+	<div class="bg-white rounded-lg shadow-lg p-6 text-center">
+		<div class="text-gray-500 mb-4">
+			<span class="text-4xl">🍺</span>
+		</div>
+		<h3 class="text-lg font-semibold text-gray-700 mb-2">Busca cervezas argentinas</h3>
+		<p class="text-gray-500">Usa los filtros arriba para encontrar cervezas específicas</p>
+	</div>
+	{% endif %}
+</body>
+
+</html>

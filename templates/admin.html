@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<script src="https://cdn.tailwindcss.com"></script>
+	<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+	<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+	<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+
+	<title>Panel de Administración</title>
+</head>
+
+<body class="px-6 py-4 bg-gray-50">
+	<!-- Navegación -->
+	<div class="flex justify-between items-center mb-6">
+		<div class="flex items-center space-x-4">
+			<a href="/recomendaciones" class="text-amber-600 hover:text-amber-800 transition-colors">
+				← Volver a Recomendaciones
+			</a>
+			<h1 class="text-2xl font-bold text-gray-800">Panel de Administración</h1>
+		</div>
+		<div class="text-sm text-gray-600">
+			Admin: {{ user_id }}
+		</div>
+	</div>
+
+	<!-- Estadísticas generales del sistema -->
+	<div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+		<h2 class="text-xl font-bold text-gray-800 mb-4">Estadísticas del Sistema</h2>
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div class="text-center p-4 bg-blue-50 rounded-lg">
+				<div class="text-2xl font-bold text-blue-800">{{ total_usuarios }}</div>
+				<div class="text-sm text-gray-600">Usuarios registrados</div>
+			</div>
+			<div class="text-center p-4 bg-green-50 rounded-lg">
+				<div class="text-2xl font-bold text-green-800">{{ total_evaluaciones }}</div>
+				<div class="text-sm text-gray-600">Evaluaciones totales</div>
+			</div>
+			<div class="text-center p-4 bg-amber-50 rounded-lg">
+				<div class="text-2xl font-bold text-amber-800">{{ total_vistas }}</div>
+				<div class="text-sm text-gray-600">Cervezas vistas</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Control de Modelo -->
+	<div class="mb-6 bg-white rounded-lg shadow p-6">
+		<h2 class="text-xl font-bold mb-4">Control de Modelo</h2>
+		<form method="POST" action="/admin/retrain" onsubmit="return confirm('¿Iniciar retreinamento del modelo? Esto tomará ~30 segundos.');">
+			<button type="submit" class="bg-amber-600 text-white px-6 py-2 rounded hover:bg-amber-700">
+				Retreinar Modelo Global
+			</button>
+		</form>
+	</div>
+
+	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+		<!-- Lista de usuarios -->
+		<div class="bg-white rounded-lg shadow-lg p-6">
+			<h3 class="text-lg font-bold text-gray-800 mb-4">Usuarios del Sistema</h3>
+			<div class="space-y-3 max-h-96 overflow-y-auto">
+				{% for usuario in usuarios_stats %}
+				<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+					<div class="flex-1">
+						<div class="font-semibold text-gray-800">
+							<a href="/admin/usuario/{{usuario.user_id}}" class="hover:text-blue-600 transition-colors">
+								{{ usuario.user_id }}
+							</a>
+						</div>
+						<div class="text-sm text-gray-600">
+							{{ usuario.evaluaciones }} evaluaciones, {{ usuario.vistas }} vistas
+						</div>
+						{% if usuario.rating_promedio %}
+						<div class="text-xs text-gray-500">
+							Rating promedio: {{ "%.1f"|format(usuario.rating_promedio) }}
+						</div>
+						{% endif %}
+					</div>
+					<div class="text-right text-xs text-gray-500">
+						{% if usuario.ultima_actividad %}
+						<div>Última actividad:</div>
+						<div>{{ usuario.ultima_actividad[:10] }}</div>
+						{% endif %}
+					</div>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+
+		<!-- Top cervezas -->
+		<div class="bg-white rounded-lg shadow-lg p-6">
+			<h3 class="text-lg font-bold text-gray-800 mb-4">Top Cervezas Evaluadas</h3>
+			<div class="space-y-3 max-h-96 overflow-y-auto">
+				{% for cerveza in top_cervezas %}
+				<div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+					<div class="flex-1">
+						<div class="font-semibold text-gray-800">{{ cerveza.beer_name }}</div>
+						<div class="text-sm text-gray-600">{{ cerveza.brewery_name }}</div>
+						{% if cerveza.style %}
+						<div class="text-xs text-gray-500">{{ cerveza.style }}</div>
+						{% endif %}
+					</div>
+					<div class="text-right">
+						<div class="text-sm font-semibold text-gray-800">{{ cerveza.total_evaluaciones }} eval.</div>
+						<div class="text-xs text-gray-500">⭐ {{ "%.1f"|format(cerveza.rating_promedio) }}</div>
+					</div>
+				</div>
+				{% endfor %}
+			</div>
+		</div>
+	</div>
+
+	<!-- Top estilos -->
+	<div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+		<h3 class="text-lg font-bold text-gray-800 mb-4">Top Estilos Más Populares</h3>
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+			{% for estilo in top_estilos %}
+			<div class="p-4 bg-gray-50 rounded-lg">
+				<div class="font-semibold text-gray-800">{{ estilo.style }}</div>
+				<div class="text-sm text-gray-600">{{ estilo.total_evaluaciones }} evaluaciones</div>
+				<div class="text-xs text-gray-500">⭐ {{ "%.1f"|format(estilo.rating_promedio) }} promedio</div>
+			</div>
+			{% endfor %}
+		</div>
+	</div>
+</body>
+
+</html>
