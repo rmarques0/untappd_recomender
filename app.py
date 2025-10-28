@@ -44,7 +44,7 @@ def get_recomendaciones():
     # Verificar si es primera visita
     first_visit = is_first_visit(user_id)
     
-    id_cervezas = recomendar.recomendar(user_id)
+    id_cervezas, sistema_usado = recomendar.recomendar(user_id)
 
     # pongo cervezas vistas con rating = 0
     for id_cerveza in id_cervezas:
@@ -71,7 +71,8 @@ def get_recomendaciones():
                          cant_vistas=cant_vistas,
                          first_visit=first_visit,
                          estilos=estilos,
-                         cervecerias=cervecerias)
+                         cervecerias=cervecerias,
+                         sistema_usado=sistema_usado)
 
 @app.get('/cerveza/<string:id_cerveza>')
 def get_cerveza_detalle(id_cerveza):
@@ -347,23 +348,23 @@ def get_admin():
     cursor.execute("SELECT COUNT(*) as total FROM interaccion WHERE rating = 0")
     total_vistas = cursor.fetchone()['total']
     
-    # Lista de usuários com suas estatísticas
+    # Lista de usuários com suas estatísticas (otimizada)
     cursor.execute("""
         SELECT 
-            u.user_id,
-            COUNT(CASE WHEN i.rating > 0 THEN 1 END) as evaluaciones,
-            COUNT(CASE WHEN i.rating = 0 THEN 1 END) as vistas,
-            AVG(CASE WHEN i.rating > 0 THEN i.rating END) as rating_promedio,
-            MIN(i.fecha) as primera_actividad,
-            MAX(i.fecha) as ultima_actividad
-        FROM usuarios u
-        LEFT JOIN interaccion i ON u.user_id = i.user_id
-        GROUP BY u.user_id
-        ORDER BY evaluaciones DESC, ultima_actividad DESC
+            user_id,
+            COUNT(CASE WHEN rating > 0 THEN 1 END) as evaluaciones,
+            COUNT(CASE WHEN rating = 0 THEN 1 END) as vistas,
+            AVG(CASE WHEN rating > 0 THEN rating END) as rating_promedio,
+            MIN(fecha) as primera_actividad,
+            MAX(fecha) as ultima_actividad
+        FROM interaccion
+        GROUP BY user_id
+        ORDER BY evaluaciones DESC, vistas DESC
+        LIMIT 50
     """)
     usuarios_stats = [dict(row) for row in cursor.fetchall()]
     
-    # Top cervezas más evaluadas
+    # Top cervezas más evaluadas (otimizada)
     cursor.execute("""
         SELECT 
             c.beer_name,
@@ -380,7 +381,7 @@ def get_admin():
     """)
     top_cervezas = [dict(row) for row in cursor.fetchall()]
     
-    # Top estilos más populares
+    # Top estilos más populares (otimizada)
     cursor.execute("""
         SELECT 
             c.style,

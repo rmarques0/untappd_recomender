@@ -48,12 +48,53 @@
 	<!-- Control de Modelo -->
 	<div class="mb-6 bg-white rounded-lg shadow p-6">
 		<h2 class="text-xl font-bold mb-4">Control de Modelo</h2>
-		<form method="POST" action="/admin/retrain" onsubmit="return confirm('¿Iniciar retreinamento del modelo? Esto tomará ~30 segundos.');">
-			<button type="submit" class="bg-amber-600 text-white px-6 py-2 rounded hover:bg-amber-700">
-				Retreinar Modelo Global
-			</button>
-		</form>
+		<button id="retrainBtn" onclick="triggerRetrain()" class="bg-amber-600 text-white px-6 py-2 rounded hover:bg-amber-700">
+			Retreinar Modelo Global
+		</button>
+		<div id="retrainStatus" class="mt-2 text-sm hidden"></div>
 	</div>
+
+	<script>
+	async function triggerRetrain() {
+		const btn = document.getElementById('retrainBtn');
+		const status = document.getElementById('retrainStatus');
+		
+		if (!confirm('¿Iniciar retreinamento del modelo? Esto tomará ~30 segundos.')) {
+			return;
+		}
+		
+		btn.disabled = true;
+		btn.textContent = 'Retreinando...';
+		status.classList.remove('hidden');
+		status.textContent = 'Iniciando retreinamento...';
+		status.className = 'mt-2 text-sm text-blue-600';
+		
+		try {
+			const response = await fetch('/admin/retrain', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				}
+			});
+			
+			const result = await response.json();
+			
+			if (response.ok) {
+				status.textContent = 'Retreinamento iniciado en background (ID: ' + result.history_id + ')';
+				status.className = 'mt-2 text-sm text-green-600';
+			} else {
+				status.textContent = 'Error: ' + result.error;
+				status.className = 'mt-2 text-sm text-red-600';
+			}
+		} catch (error) {
+			status.textContent = 'Error de conexión: ' + error.message;
+			status.className = 'mt-2 text-sm text-red-600';
+		} finally {
+			btn.disabled = false;
+			btn.textContent = 'Retreinar Modelo Global';
+		}
+	}
+	</script>
 
 	<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 		<!-- Lista de usuarios -->

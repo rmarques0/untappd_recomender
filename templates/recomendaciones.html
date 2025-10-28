@@ -68,14 +68,7 @@
 			</div>
 			{% if cant_valoradas > 0 %}
 			<div class="text-sm text-amber-600">
-				<strong>Sistema de recomendación:</strong> 
-				{% if cant_valoradas == 0 %}
-					Popular (cervezas más valoradas)
-				{% elif cant_valoradas < 10 %}
-					Híbrido (popular + colaborativo)
-				{% else %}
-					Colaborativo (basado en usuarios similares)
-				{% endif %}
+				<strong>Sistema de recomendación:</strong> {{ sistema_usado }}
 			</div>
 			{% endif %}
 		</div>

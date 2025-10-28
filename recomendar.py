@@ -266,7 +266,8 @@ def recomendar(user_id, cervezas_relevantes=None, cervezas_desconocidas=None, N=
     
     if num_evaluaciones == 0:
         # Cold start: recomendaciones populares
-        return recomendar_popular(user_id, cervezas_desconocidas, N)
+        resultado = recomendar_popular(user_id, cervezas_desconocidas, N)
+        return resultado, "Popular (cervezas más valoradas)"
     elif num_evaluaciones < 10:
         # Few-shot: mezcla de popular y colaborativo
         popular = recomendar_popular(user_id, cervezas_desconocidas, N)
@@ -285,15 +286,34 @@ def recomendar(user_id, cervezas_relevantes=None, cervezas_desconocidas=None, N=
             adicionales = recomendar_popular(user_id, cervezas_restantes, N - len(resultado_sin_duplicados))
             resultado_sin_duplicados.extend(adicionales)
         
-        return resultado_sin_duplicados[:N]
+        return resultado_sin_duplicados[:N], "Híbrido (popular + colaborativo)"
     else:
         # Suficientes datos: usar two-tower si está disponible
         try:
-            return recomendar_two_tower(user_id, N)
+            resultado = recomendar_two_tower(user_id, N)
+            return resultado, "Two-Tower (personalizado)"
         except Exception as e:
             # Fallback a colaborativo si two-tower falla
             print(f"Two-tower falló ({e}), usando colaborativo")
-            return recomendar_colaborativo(user_id, cervezas_relevantes, cervezas_desconocidas, N)
+            
+            # Si el error es porque el usuario no está en el modelo, disparar retreinamento
+            if "no está en el modelo" in str(e):
+                try:
+                    from models import trigger_retrain_global
+                    trigger_retrain_global("user_not_in_model_retry")
+                    print("Retreinamento global iniciado para incluir usuario")
+                except Exception as retrain_error:
+                    print(f"Error disparando retreinamento: {retrain_error}")
+            elif "Modelo incompatible" in str(e) or "Retreinar modelo necesario" in str(e):
+                try:
+                    from models import trigger_retrain_global
+                    trigger_retrain_global("model_incompatible")
+                    print("Retreinamento global iniciado por incompatibilidad de modelo")
+                except Exception as retrain_error:
+                    print(f"Error disparando retreinamento: {retrain_error}")
+            
+            resultado = recomendar_colaborativo(user_id, cervezas_relevantes, cervezas_desconocidas, N)
+            return resultado, "Colaborativo (basado en usuarios similares)"
 
 def recomendar_contexto(user_id, beer_id, cervezas_relevantes=None, cervezas_desconocidas=None, N=3):
     """Recomendación contextual basada en una cerveza específica"""
@@ -342,6 +362,11 @@ def recomendar_two_tower(user_id, N=9):
         model = keras.models.load_model(model_path, compile=False)
     except ImportError:
         raise Exception("Keras no instalado. Agregar a requirements.txt")
+    except Exception as e:
+        if "Could not deserialize" in str(e) or "parent module" in str(e):
+            raise Exception("Modelo incompatible con versión actual de Keras. Retreinar modelo necesario.")
+        else:
+            raise Exception(f"Error cargando modelo: {e}")
     
     # Cargar mappings
     with open(MAPPINGS_PATH, 'rb') as f:
@@ -355,7 +380,15 @@ def recomendar_two_tower(user_id, N=9):
     
     # Verificar que usuario existe en modelo
     if user_id not in user_to_idx:
-        print(f"⚠️  Usuario {user_id} no está en el modelo entrenado, usando estrategia de fallback")
+        print(f"Usuario {user_id} no está en el modelo entrenado, disparando retreinamento global")
+        # Disparar retreinamento global para incluir este usuario
+        try:
+            from models import trigger_retrain_global
+            trigger_retrain_global("new_user_not_in_model")
+            print("Retreinamento global iniciado en background")
+        except Exception as e:
+            print(f"Error disparando retreinamento: {e}")
+        
         # Obtener cervezas desconocidas y relevantes para fallback
         cervezas_desconocidas = items_desconocidos(user_id)
         cervezas_relevantes = items_valorados(user_id)
