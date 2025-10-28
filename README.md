@@ -45,7 +45,7 @@ untappd_recomender/
 ### 1. Clonar el Repositorio
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/rmarques0/untappd_recomender.git
 cd untappd_recomender
 ```
 
