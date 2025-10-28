@@ -1,0 +1,5 @@
+Flask==2.3.3
+Werkzeug==2.3.7
+keras>=3.0.0
+tensorflow>=2.15.0
+numpy>=1.24.0
