@@ -104,7 +104,7 @@ def datos_cervezas(beer_ids):
     
     placeholders = ','.join(['?'] * len(beer_ids))
     query = f"SELECT * FROM cervezas WHERE beer_id IN ({placeholders})"
-    rows = sql_select(query, beer_ids)
+    rows = sql_select(query, tuple(beer_ids))
     
     cervezas = []
     for row in rows:
@@ -138,7 +138,7 @@ def recomendar_popular(user_id, cervezas_desconocidas, N=9):
         ORDER BY rating DESC, total_ratings DESC
         LIMIT ?
     """
-    result = sql_select(query, cervezas_desconocidas + [N])
+    result = sql_select(query, tuple(cervezas_desconocidas + [N]))
     return [row["beer_id"] for row in result]
 
 def recomendar_colaborativo(user_id, cervezas_relevantes, cervezas_desconocidas, N=9):
@@ -187,7 +187,7 @@ def obtener_usuarios_similares(user_id, cervezas_relevantes, min_similarity=0.3,
         AND i1.beer_id IN ({placeholders})
         AND i1.rating > 0
     """
-    result = sql_select(query, [user_id] + cervezas_relevantes)
+    result = sql_select(query, tuple([user_id] + cervezas_relevantes))
     
     # Agrupar por usuario
     user_ratings_dict = {}
@@ -250,7 +250,7 @@ def obtener_cervezas_usuarios_similares(usuarios_similares, cervezas_desconocida
         LIMIT ?
     """
     
-    result = sql_select(query, usuarios_similares + cervezas_desconocidas + [N])
+    result = sql_select(query, tuple(usuarios_similares + cervezas_desconocidas + [N]))
     return [row["beer_id"] for row in result]
 
 def recomendar(user_id, cervezas_relevantes=None, cervezas_desconocidas=None, N=9):

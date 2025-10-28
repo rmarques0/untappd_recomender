@@ -106,7 +106,7 @@ def get_cerveza_detalle(id_cerveza):
     user_rating = user_rating_row['rating'] if user_rating_row else 0
     
     # Obtener recomendaciones relacionadas
-    id_cervezas = recomendar.recomendar_contexto(user_id, id_cerveza, N=6)
+    id_cervezas, sistema_usado = recomendar.recomendar_contexto(user_id, id_cerveza, N=6)
     cervezas_recomendadas = recomendar.datos_cervezas(id_cervezas)
     
     # Estadísticas del usuario
@@ -128,7 +128,7 @@ def get_cerveza_detalle(id_cerveza):
 def get_recomendaciones_cerveza(id_cerveza):
     user_id = request.cookies.get('user_id')
 
-    id_cervezas = recomendar.recomendar_contexto(user_id, id_cerveza)
+    id_cervezas, sistema_usado = recomendar.recomendar_contexto(user_id, id_cerveza)
 
     # pongo cervezas vistas con rating = 0
     for id_cerveza in id_cervezas:
