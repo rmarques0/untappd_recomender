@@ -531,10 +531,12 @@ def trigger_retrain_global(reason="manual"):
     conn.close()
     
     # Ejecutar en background
+    import sys
+    import os
     subprocess.Popen([
         'python3', '-c', 'from models import train_model; train_model()',
         '--history-id', str(history_id)
-    ])
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     print(f"Retreinamento global iniciado (ID: {history_id})")
     return history_id
@@ -558,7 +560,7 @@ def trigger_fine_tuning(user_id):
     # Ejecutar en background
     subprocess.Popen([
         'python3', '-c', f'from models import fine_tune_user_model; fine_tune_user_model("{user_id}")'
-    ])
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     print(f"Fine-tuning iniciado para {user_id}")
 

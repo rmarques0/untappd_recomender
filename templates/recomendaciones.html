@@ -22,7 +22,7 @@
 				<div class="text-blue-700 space-y-2">
 					<p><strong>¿Cómo funciona?</strong></p>
 					<ul class="list-disc list-inside space-y-1 ml-4">
-						<li>Evalúa las cervezas que aparecen abajo (0.5 a 5.0 estrellas)</li>
+						<li>Evalúa las cervezas que aparecen abajo (1 a 5 estrellas)</li>
 						<li>El sistema evoluciona: Popular → Híbrido → Colaborativo</li>
 						<li>Con 5+ evaluaciones, encuentra usuarios con gustos similares</li>
 						<li>Puedes hacer clic en cualquier cerveza para ver más detalles</li>
@@ -66,82 +66,181 @@
 			<div class="text-sm text-gray-600">
 				<strong>Progreso:</strong> {{ cant_vistas }} vistas, {{ cant_valoradas }} valoradas
 			</div>
-			{% if cant_valoradas > 0 %}
-			<div class="text-sm text-amber-600">
-				<strong>Sistema de recomendación:</strong> {{ sistema_usado }}
+			<div class="flex flex-col items-end gap-1">
+				{% if cant_valoradas > 0 %}
+				<div class="text-sm text-amber-600">
+					<strong>Sistema de recomendación:</strong> {{ sistema_usado }}
+				</div>
+				{% endif %}
+				<div class="text-xs text-gray-500">
+					Última actualización: {{ last_update_date }}
+				</div>
+				<div class="mt-2">
+					<a href="/recomendaciones" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-lg shadow-md transition-colors flex items-center gap-2 text-sm">
+						<span>🔄</span>
+						<span>Descubrir más cervezas</span>
+					</a>
+				</div>
 			</div>
-			{% endif %}
 		</div>
 	</div>
 
-	<form method="post" action="/recomendaciones">
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-			{% for cerveza in cervezas_recomendadas %}
-			<div class="card bg-white shadow-lg border border-amber-200 rounded-lg overflow-hidden">
-				<div class="flex">
-					{% if cerveza.image_url %}
-					<img src="{{ cerveza.image_url }}" class="w-24 h-32 object-cover" alt="{{ cerveza.beer_name }}" />
-					{% else %}
-					<div class="w-24 h-32 bg-amber-100 flex items-center justify-center">
-						<span class="text-2xl">🍺</span>
+	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+		{% for cerveza in cervezas_recomendadas %}
+		<div class="card bg-white shadow-lg border border-amber-200 rounded-lg overflow-hidden">
+			<div class="flex">
+				{% if cerveza.image_url %}
+				<img src="{{ cerveza.image_url }}" class="w-24 h-32 object-cover" alt="{{ cerveza.beer_name }}" />
+				{% else %}
+				<div class="w-24 h-32 bg-amber-100 flex items-center justify-center">
+					<span class="text-2xl">🍺</span>
+				</div>
+				{% endif %}
+
+				<div class="card-body p-4 flex-1">
+					<h2 class="card-title text-lg font-semibold text-amber-800 mb-2">
+						<a href="/cerveza/{{cerveza.beer_id}}" class="hover:text-amber-600 transition-colors">
+							{{ cerveza.beer_name|title }}
+						</a>
+					</h2>
+					
+					<div class="text-sm text-gray-600 mb-2">
+						<span class="font-medium">{{ cerveza.brewery_name|title }}</span>
+						{% if cerveza.style %}
+						<br><span class="text-amber-600">{{ cerveza.style }}</span>
+						{% endif %}
 					</div>
-					{% endif %}
 
-					<div class="card-body p-4 flex-1">
-						<h2 class="card-title text-lg font-semibold text-amber-800 mb-2">
-							<a href="/cerveza/{{cerveza.beer_id}}" class="hover:text-amber-600 transition-colors">
-								{{ cerveza.beer_name|title }}
-							</a>
-						</h2>
-						
-						<div class="text-sm text-gray-600 mb-2">
-							<span class="font-medium">{{ cerveza.brewery_name|title }}</span>
-							{% if cerveza.style %}
-							<br><span class="text-amber-600">{{ cerveza.style }}</span>
-							{% endif %}
-						</div>
+					<div class="flex justify-between text-xs text-gray-500 mb-3">
+						{% if cerveza.abv and cerveza.abv != '0' %}
+						<span>ABV: {{ cerveza.abv }}%</span>
+						{% endif %}
+						{% if cerveza.ibu and cerveza.ibu != '0' %}
+						<span>IBU: {{ cerveza.ibu }}</span>
+						{% endif %}
+						{% if cerveza.rating and cerveza.rating != '0' %}
+						<span>⭐ {{ cerveza.rating }}</span>
+						{% endif %}
+					</div>
 
-						<div class="flex justify-between text-xs text-gray-500 mb-3">
-							{% if cerveza.abv and cerveza.abv != '0' %}
-							<span>ABV: {{ cerveza.abv }}%</span>
-							{% endif %}
-							{% if cerveza.ibu and cerveza.ibu != '0' %}
-							<span>IBU: {{ cerveza.ibu }}</span>
-							{% endif %}
-							{% if cerveza.rating and cerveza.rating != '0' %}
-							<span>⭐ {{ cerveza.rating }}</span>
-							{% endif %}
-						</div>
-
-						<div class="card-actions justify-end items-center mt-auto">
-							<div class="flex items-center">
-								<label for="{{cerveza.beer_id}}" class="text-sm text-gray-700 mr-2">Mi puntuación:</label>
-								<select name="{{cerveza.beer_id}}" aria-label="Puntuación para {{ cerveza.beer_name }}" class="px-3 py-1 text-sm border border-amber-300 rounded focus:ring-amber-500 focus:border-amber-500">
-									<option value="0" selected>Sin puntuar</option>
-									<option value="0.5">0.5</option>
-									<option value="1">1</option>
-									<option value="1.5">1.5</option>
-									<option value="2">2</option>
-									<option value="2.5">2.5</option>
-									<option value="3">3</option>
-									<option value="3.5">3.5</option>
-									<option value="4">4</option>
-									<option value="4.5">4.5</option>
-									<option value="5">5</option>
-								</select>
-							</div>
+					<div class="card-actions justify-end items-center mt-auto">
+						<div class="flex flex-col items-end">
+							<label class="text-xs text-gray-600 mb-1">Mi puntuación:</label>
+							<div id="rating-{{cerveza.beer_id}}" class="star-rating" data-beer-id="{{cerveza.beer_id}}" data-current-rating="{{ user_ratings.get(cerveza.beer_id, 0) }}"></div>
 						</div>
 					</div>
 				</div>
 			</div>
-			{% endfor %}
 		</div>
+		{% endfor %}
+	</div>
 
-		<div class="flex justify-center mt-8">
-			<input type="submit" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-8 py-3 rounded-lg cursor-pointer transition-colors text-lg" 
-				value="Guardar Evaluaciones y Obtener Nuevas Recomendaciones">
-		</div>
-	</form>
+	<script>
+		// Función para crear componente de estrellas
+		function createStarRating(beerId, currentRating) {
+			const container = document.getElementById(`rating-${beerId}`);
+			if (!container) return;
+			
+			container.innerHTML = '';
+			currentRating = currentRating || 0;
+			
+			// Crear contenedor de estrellas
+			const starsContainer = document.createElement('div');
+			starsContainer.className = 'flex items-center gap-1';
+			
+			// Crear 5 estrellas
+			for (let i = 1; i <= 5; i++) {
+				const star = document.createElement('span');
+				star.className = `star text-2xl cursor-pointer transition-all ${i <= currentRating ? 'text-yellow-400' : 'text-gray-300'}`;
+				star.innerHTML = '★';
+				star.dataset.rating = i;
+				
+				// Hover effect
+				star.addEventListener('mouseenter', function() {
+					const rating = parseInt(this.dataset.rating);
+					highlightStars(container, rating);
+				});
+				
+				star.addEventListener('mouseleave', function() {
+					highlightStars(container, currentRating);
+				});
+				
+				// Click para guardar
+				star.addEventListener('click', function() {
+					const rating = parseInt(this.dataset.rating);
+					saveRating(beerId, rating, container);
+				});
+				
+				starsContainer.appendChild(star);
+			}
+			
+			container.appendChild(starsContainer);
+			
+			// Botón para quitar rating (0) - cambiar texto según si hay evaluación
+			const clearBtn = document.createElement('button');
+			if (currentRating > 0) {
+				clearBtn.className = 'text-xs text-gray-500 hover:text-red-600 ml-2';
+				clearBtn.textContent = 'Quitar';
+			} else {
+				clearBtn.className = 'text-xs text-gray-500 hover:text-gray-700 ml-2';
+				clearBtn.textContent = 'Sin puntuar';
+			}
+			clearBtn.addEventListener('click', function() {
+				saveRating(beerId, 0, container);
+			});
+			container.appendChild(clearBtn);
+		}
+		
+		function highlightStars(container, rating) {
+			const stars = container.querySelectorAll('.star');
+			stars.forEach((star, index) => {
+				if (index < rating) {
+					star.className = 'star text-2xl cursor-pointer transition-all text-yellow-400';
+				} else {
+					star.className = 'star text-2xl cursor-pointer transition-all text-gray-300';
+				}
+			});
+		}
+		
+		async function saveRating(beerId, rating, container) {
+			try {
+				const response = await fetch('/api/rating', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						beer_id: beerId,
+						rating: rating
+					})
+				});
+				
+				const data = await response.json();
+				if (data.success) {
+					// Actualizar visualmente
+					createStarRating(beerId, rating);
+					// Mostrar mensaje de éxito mejorado
+					const successMsg = document.createElement('span');
+					successMsg.className = 'text-xs text-green-600 ml-2 font-semibold';
+					successMsg.textContent = rating > 0 ? '✓ Guardado' : '✓ Removido';
+					container.appendChild(successMsg);
+					setTimeout(() => successMsg.remove(), 2000);
+				} else {
+					alert('Error al guardar evaluación: ' + (data.error || 'Error desconocido'));
+				}
+			} catch (error) {
+				console.error('Error:', error);
+				alert('Error al guardar evaluación');
+			}
+		}
+		
+		// Inicializar estrellas para todas las cervezas
+		document.addEventListener('DOMContentLoaded', function() {
+			{% for cerveza in cervezas_recomendadas %}
+			createStarRating('{{cerveza.beer_id}}', {{ user_ratings.get(cerveza.beer_id, 0) }});
+			{% endfor %}
+		});
+	</script>
 </body>
 
 </html>

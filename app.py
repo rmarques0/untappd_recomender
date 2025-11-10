@@ -1,6 +1,6 @@
 from flask import Flask, request, render_template, make_response, redirect, url_for, jsonify
 import recomendar
-from config import DATABASE_FILE, ADMIN_USER_ID
+from config import DATABASE_FILE, ADMIN_USER_ID, LAST_UPDATE_DATE
 from database import get_db_connection
 from models import verificar_y_disparar_retreinamiento, trigger_retrain_global
 
@@ -54,9 +54,26 @@ def get_recomendaciones():
     cant_valoradas = len(recomendar.items_valorados(user_id))
     cant_vistas = len(recomendar.items_vistos(user_id))
     
-    # Obtener estilos únicos para filtros
+    # Obtener ratings existentes del usuario para las cervezas recomendadas
     conn = get_db_connection()
     cursor = conn.cursor()
+    user_ratings = {}
+    if id_cervezas:
+        placeholders = ','.join(['?'] * len(id_cervezas))
+        cursor.execute(f"""
+            SELECT beer_id, rating 
+            FROM interaccion 
+            WHERE user_id = ? AND beer_id IN ({placeholders})
+        """, [user_id] + id_cervezas)
+        for row in cursor.fetchall():
+            rating_value = row['rating']
+            # Asegurar que convertimos correctamente, incluso si es None o 0
+            if rating_value is not None:
+                user_ratings[row['beer_id']] = int(float(rating_value))
+            else:
+                user_ratings[row['beer_id']] = 0
+    
+    # Obtener estilos únicos para filtros
     cursor.execute("SELECT DISTINCT style FROM cervezas WHERE style IS NOT NULL AND style != '' ORDER BY style")
     estilos = [row['style'] for row in cursor.fetchall()]
     
@@ -66,13 +83,15 @@ def get_recomendaciones():
 
     return render_template("recomendaciones.html", 
                          cervezas_recomendadas=cervezas_recomendadas, 
+                         user_ratings=user_ratings,
                          user_id=user_id, 
                          cant_valoradas=cant_valoradas, 
                          cant_vistas=cant_vistas,
                          first_visit=first_visit,
                          estilos=estilos,
                          cervecerias=cervecerias,
-                         sistema_usado=sistema_usado)
+                         sistema_usado=sistema_usado,
+                         last_update_date=LAST_UPDATE_DATE)
 
 @app.get('/cerveza/<string:id_cerveza>')
 def get_cerveza_detalle(id_cerveza):
@@ -103,11 +122,28 @@ def get_cerveza_detalle(id_cerveza):
         WHERE user_id = ? AND beer_id = ?
     """, [user_id, id_cerveza])
     user_rating_row = cursor.fetchone()
-    user_rating = user_rating_row['rating'] if user_rating_row else 0
+    user_rating = int(user_rating_row['rating']) if user_rating_row and user_rating_row['rating'] else 0
     
     # Obtener recomendaciones relacionadas
     id_cervezas, sistema_usado = recomendar.recomendar_contexto(user_id, id_cerveza, N=6)
     cervezas_recomendadas = recomendar.datos_cervezas(id_cervezas)
+    
+    # Obtener ratings del usuario para las cervezas recomendadas
+    user_ratings = {}
+    if id_cervezas:
+        placeholders = ','.join(['?'] * len(id_cervezas))
+        cursor.execute(f"""
+            SELECT beer_id, rating 
+            FROM interaccion 
+            WHERE user_id = ? AND beer_id IN ({placeholders})
+        """, [user_id] + id_cervezas)
+        for row in cursor.fetchall():
+            rating_value = row['rating']
+            # Asegurar que convertimos correctamente, incluso si es None o 0
+            if rating_value is not None:
+                user_ratings[row['beer_id']] = int(float(rating_value))
+            else:
+                user_ratings[row['beer_id']] = 0
     
     # Estadísticas del usuario
     cant_valoradas = len(recomendar.items_valorados(user_id))
@@ -122,7 +158,8 @@ def get_cerveza_detalle(id_cerveza):
                          user_id=user_id, 
                          cant_valoradas=cant_valoradas, 
                          cant_vistas=cant_vistas,
-                         user_rating=user_rating)
+                         user_rating=user_rating,
+                         user_ratings=user_ratings)
 
 @app.get('/recomendaciones/<string:id_cerveza>')
 def get_recomendaciones_cerveza(id_cerveza):
@@ -142,6 +179,40 @@ def get_recomendaciones_cerveza(id_cerveza):
 
     return render_template("recomendaciones_cerveza.html", cerveza=cerveza, cervezas_recomendadas=cervezas_recomendadas, user_id=user_id, cant_valoradas=cant_valoradas, cant_vistas=cant_vistas)
 
+
+@app.post('/api/rating')
+def post_api_rating():
+    """API endpoint para guardar evaluación via AJAX"""
+    user_id = request.cookies.get('user_id')
+    
+    if not user_id:
+        return jsonify({"error": "Usuario no autenticado"}), 401
+    
+    data = request.get_json()
+    beer_id = data.get('beer_id')
+    rating = data.get('rating')
+    
+    if not beer_id:
+        return jsonify({"error": "beer_id requerido"}), 400
+    
+    # Validar rating: debe ser entero entre 0 y 5
+    try:
+        rating = int(rating)
+        if rating < 0 or rating > 5:
+            return jsonify({"error": "Rating debe estar entre 0 y 5"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "Rating debe ser un número entero"}), 400
+    
+    # Guardar evaluación
+    recomendar.insertar_interacciones(beer_id, user_id, rating)
+    
+    # Verificar y disparar retreinamiento si necesario
+    try:
+        verificar_y_disparar_retreinamiento(user_id)
+    except Exception as e:
+        print(f"Error en verificación de retreinamiento: {e}")
+    
+    return jsonify({"success": True, "beer_id": beer_id, "rating": rating})
 
 @app.post('/recomendaciones')
 def post_recomendaciones():
@@ -165,6 +236,13 @@ def post_recomendaciones():
 def get_buscar():
     """Página de búsqueda de cervezas"""
     user_id = request.cookies.get('user_id')
+    
+    # Debug: verificar user_id
+    if not user_id:
+        print(f"DEBUG buscar: user_id está None o vacío!")
+    else:
+        print(f"DEBUG buscar: user_id={user_id}")
+    
     query = request.args.get('q', '')
     estilo = request.args.get('estilo', '')
     cerveceria = request.args.get('cerveceria', '')
@@ -172,6 +250,8 @@ def get_buscar():
     abv_max = request.args.get('abv_max', '')
     
     cervezas = []
+    user_ratings = {}  # Diccionario para almacenar ratings del usuario
+    
     if query or estilo or cerveceria or abv_min or abv_max:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -207,6 +287,40 @@ def get_buscar():
         
         cursor.execute(sql, params)
         cervezas = [dict(row) for row in cursor.fetchall()]
+        
+        # Obtener ratings del usuario para las cervezas encontradas
+        if cervezas and user_id:
+            beer_ids = [c['beer_id'] for c in cervezas]
+            if beer_ids:
+                placeholders = ','.join(['?'] * len(beer_ids))
+                query_ratings = f"""
+                    SELECT beer_id, rating 
+                    FROM interaccion 
+                    WHERE user_id = ? AND beer_id IN ({placeholders})
+                """
+                cursor.execute(query_ratings, [user_id] + beer_ids)
+                ratings_rows = cursor.fetchall()
+                print(f"DEBUG buscar: user_id={user_id}")
+                print(f"DEBUG buscar: beer_ids buscados={beer_ids[:5] if len(beer_ids) > 5 else beer_ids}")
+                print(f"DEBUG buscar: ratings encontrados en DB={len(ratings_rows)}")
+                for row in ratings_rows:
+                    rating_value = row['rating']
+                    beer_id = str(row['beer_id'])  # Asegurar que beer_id sea string
+                    # Asegurar que convertimos correctamente, incluso si es None o 0
+                    if rating_value is not None:
+                        user_ratings[beer_id] = int(float(rating_value))
+                        print(f"DEBUG buscar: beer_id={beer_id}, rating={user_ratings[beer_id]}")
+                    else:
+                        user_ratings[beer_id] = 0
+                print(f"DEBUG buscar: user_ratings final={user_ratings}")
+            else:
+                print(f"DEBUG buscar: No hay beer_ids para buscar ratings")
+        else:
+            if not cervezas:
+                print(f"DEBUG buscar: No hay cervezas encontradas")
+            if not user_id:
+                print(f"DEBUG buscar: user_id está None, no se pueden buscar ratings")
+        
         conn.close()
     
     # Obtener opciones para filtros
@@ -224,6 +338,7 @@ def get_buscar():
     
     return render_template("buscar.html", 
                          cervezas=cervezas,
+                         user_ratings=user_ratings,
                          query=query,
                          estilo=estilo,
                          cerveceria=cerveceria,
@@ -483,6 +598,6 @@ def get_reset():
     return make_response(redirect("/recomendaciones"))
 
 if __name__ == '__main__':
-    app.run()
+    app.run(port=5001)
 
 

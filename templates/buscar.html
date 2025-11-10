@@ -160,10 +160,15 @@
 						</div>
 
 						{% if cerveza.total_ratings %}
-						<div class="text-xs text-gray-500">
+						<div class="text-xs text-gray-500 mb-2">
 							{{ cerveza.total_ratings }} evaluaciones
 						</div>
 						{% endif %}
+
+						<div class="flex flex-col items-start mt-2">
+							<label class="text-xs text-gray-600 mb-1">Mi puntuación:</label>
+							<div id="rating-{{cerveza.beer_id}}" class="star-rating" data-beer-id="{{cerveza.beer_id}}" data-current-rating="{{ user_ratings.get(cerveza.beer_id|string, 0) }}"></div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -190,6 +195,116 @@
 		<p class="text-gray-500">Usa los filtros arriba para encontrar cervezas específicas</p>
 	</div>
 	{% endif %}
+
+	<script>
+		// Función para crear componente de estrellas
+		function createStarRating(beerId, currentRating) {
+			const container = document.getElementById(`rating-${beerId}`);
+			if (!container) return;
+			
+			container.innerHTML = '';
+			currentRating = currentRating || 0;
+			
+			// Crear contenedor de estrellas
+			const starsContainer = document.createElement('div');
+			starsContainer.className = 'flex items-center gap-1';
+			
+			// Crear 5 estrellas
+			for (let i = 1; i <= 5; i++) {
+				const star = document.createElement('span');
+				star.className = `star text-xl cursor-pointer transition-all ${i <= currentRating ? 'text-yellow-400' : 'text-gray-300'}`;
+				star.innerHTML = '★';
+				star.dataset.rating = i;
+				
+				// Hover effect
+				star.addEventListener('mouseenter', function() {
+					const rating = parseInt(this.dataset.rating);
+					highlightStars(container, rating);
+				});
+				
+				star.addEventListener('mouseleave', function() {
+					highlightStars(container, currentRating);
+				});
+				
+				// Click para guardar
+				star.addEventListener('click', function() {
+					const rating = parseInt(this.dataset.rating);
+					saveRating(beerId, rating, container);
+				});
+				
+				starsContainer.appendChild(star);
+			}
+			
+			container.appendChild(starsContainer);
+			
+			// Botón para quitar rating (0) - cambiar texto según si hay evaluación
+			const clearBtn = document.createElement('button');
+			if (currentRating > 0) {
+				clearBtn.className = 'text-xs text-gray-500 hover:text-red-600 ml-2';
+				clearBtn.textContent = 'Quitar';
+			} else {
+				clearBtn.className = 'text-xs text-gray-500 hover:text-gray-700 ml-2';
+				clearBtn.textContent = 'Sin puntuar';
+			}
+			clearBtn.addEventListener('click', function() {
+				saveRating(beerId, 0, container);
+			});
+			container.appendChild(clearBtn);
+		}
+		
+		function highlightStars(container, rating) {
+			const stars = container.querySelectorAll('.star');
+			stars.forEach((star, index) => {
+				if (index < rating) {
+					star.className = 'star text-xl cursor-pointer transition-all text-yellow-400';
+				} else {
+					star.className = 'star text-xl cursor-pointer transition-all text-gray-300';
+				}
+			});
+		}
+		
+		async function saveRating(beerId, rating, container) {
+			try {
+				const response = await fetch('/api/rating', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						beer_id: beerId,
+						rating: rating
+					})
+				});
+				
+				const data = await response.json();
+				if (data.success) {
+					// Actualizar visualmente
+					createStarRating(beerId, rating);
+					// Mostrar mensaje de éxito mejorado
+					const successMsg = document.createElement('span');
+					successMsg.className = 'text-xs text-green-600 ml-2 font-semibold';
+					successMsg.textContent = rating > 0 ? '✓ Guardado' : '✓ Removido';
+					container.appendChild(successMsg);
+					setTimeout(() => successMsg.remove(), 2000);
+				} else {
+					alert('Error al guardar evaluación: ' + (data.error || 'Error desconocido'));
+				}
+			} catch (error) {
+				console.error('Error:', error);
+				alert('Error al guardar evaluación');
+			}
+		}
+		
+		// Inicializar estrellas para todas las cervezas
+		document.addEventListener('DOMContentLoaded', function() {
+			{% for cerveza in cervezas %}
+			const beerId = '{{cerveza.beer_id}}';
+			const rating = {{ user_ratings.get(cerveza.beer_id|string, 0) }};
+			console.log(`DEBUG: Inicializando cerveza ${beerId} con rating ${rating}`);
+			createStarRating(beerId, rating);
+			{% endfor %}
+		});
+	</script>
 </body>
 
 </html>

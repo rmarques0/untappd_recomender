@@ -94,28 +94,12 @@
 				{% endif %}
 
 				<!-- Evaluación del usuario -->
-				<form method="post" action="/recomendaciones" class="mt-4">
+				<div class="mt-4">
 					<div class="flex items-center space-x-4">
-						<label for="{{cerveza.beer_id}}" class="text-gray-700 font-medium">Mi evaluación:</label>
-						<select name="{{cerveza.beer_id}}" aria-label="Puntuación para {{ cerveza.beer_name }}" 
-								class="px-4 py-2 border border-amber-300 rounded focus:ring-amber-500 focus:border-amber-500">
-							<option value="0" {% if user_rating == 0 %}selected{% endif %}>Sin puntuar</option>
-							<option value="0.5" {% if user_rating == 0.5 %}selected{% endif %}>0.5</option>
-							<option value="1" {% if user_rating == 1 %}selected{% endif %}>1</option>
-							<option value="1.5" {% if user_rating == 1.5 %}selected{% endif %}>1.5</option>
-							<option value="2" {% if user_rating == 2 %}selected{% endif %}>2</option>
-							<option value="2.5" {% if user_rating == 2.5 %}selected{% endif %}>2.5</option>
-							<option value="3" {% if user_rating == 3 %}selected{% endif %}>3</option>
-							<option value="3.5" {% if user_rating == 3.5 %}selected{% endif %}>3.5</option>
-							<option value="4" {% if user_rating == 4 %}selected{% endif %}>4</option>
-							<option value="4.5" {% if user_rating == 4.5 %}selected{% endif %}>4.5</option>
-							<option value="5" {% if user_rating == 5 %}selected{% endif %}>5</option>
-						</select>
-						<button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-4 py-2 rounded transition-colors">
-							Guardar
-						</button>
+						<label class="text-gray-700 font-medium">Mi evaluación:</label>
+						<div id="rating-{{cerveza.beer_id}}" class="star-rating" data-beer-id="{{cerveza.beer_id}}" data-current-rating="{{ user_rating }}"></div>
 					</div>
-				</form>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -150,14 +134,20 @@
 							{% endif %}
 						</div>
 
-						<div class="flex justify-between text-xs text-gray-500">
-							{% if cerveza_rec.abv and cerveza_rec.abv != '0' %}
-							<span>ABV: {{ cerveza_rec.abv }}%</span>
-							{% endif %}
-							{% if cerveza_rec.rating and cerveza_rec.rating != '0' %}
-							<span>⭐ {{ cerveza_rec.rating }}</span>
-							{% endif %}
-						</div>
+					<div class="flex justify-between text-xs text-gray-500">
+						{% if cerveza_rec.abv and cerveza_rec.abv != '0' %}
+						<span>ABV: {{ cerveza_rec.abv }}%</span>
+						{% endif %}
+						{% if cerveza_rec.rating and cerveza_rec.rating != '0' %}
+						<span>⭐ {{ cerveza_rec.rating }}</span>
+						{% endif %}
+					</div>
+
+					<!-- Evaluación del usuario -->
+					<div class="mt-2 flex flex-col items-end">
+						<label class="text-xs text-gray-600 mb-1">Mi puntuación:</label>
+						<div id="rating-{{cerveza_rec.beer_id}}" class="star-rating" data-beer-id="{{cerveza_rec.beer_id}}" data-current-rating="{{ user_ratings.get(cerveza_rec.beer_id, 0) }}"></div>
+					</div>
 					</div>
 				</div>
 			</div>
@@ -199,5 +189,124 @@
 	</div>
 	{% endif %}
 </body>
+
+<script>
+	// Función para crear componente de estrellas
+	function createStarRating(beerId, currentRating, size = 'large') {
+		const container = document.getElementById(`rating-${beerId}`);
+		if (!container) return;
+		
+		container.innerHTML = '';
+		currentRating = currentRating || 0;
+		
+		// Tamaño de las estrellas según el contexto
+		const starSize = size === 'small' ? 'text-xl' : 'text-3xl';
+		const buttonSize = size === 'small' ? 'text-xs' : 'text-sm';
+		
+		// Crear contenedor de estrellas
+		const starsContainer = document.createElement('div');
+		starsContainer.className = 'flex items-center gap-1';
+		
+		// Crear 5 estrellas
+		for (let i = 1; i <= 5; i++) {
+			const star = document.createElement('span');
+			star.className = `star ${starSize} cursor-pointer transition-all ${i <= currentRating ? 'text-yellow-400' : 'text-gray-300'}`;
+			star.innerHTML = '★';
+			star.dataset.rating = i;
+			
+			// Hover effect
+			star.addEventListener('mouseenter', function() {
+				const rating = parseInt(this.dataset.rating);
+				highlightStars(container, rating, starSize);
+			});
+			
+			star.addEventListener('mouseleave', function() {
+				highlightStars(container, currentRating, starSize);
+			});
+			
+			// Click para guardar
+			star.addEventListener('click', function() {
+				const rating = parseInt(this.dataset.rating);
+				saveRating(beerId, rating, container, starSize);
+			});
+			
+			starsContainer.appendChild(star);
+		}
+		
+		container.appendChild(starsContainer);
+		
+		// Botón para quitar rating (0) - solo mostrar si hay evaluación o si no hay ninguna
+		if (currentRating > 0) {
+			const clearBtn = document.createElement('button');
+			clearBtn.className = `${buttonSize} text-gray-500 hover:text-red-600 ml-3`;
+			clearBtn.textContent = 'Quitar';
+			clearBtn.addEventListener('click', function() {
+				saveRating(beerId, 0, container, starSize);
+			});
+			container.appendChild(clearBtn);
+		} else {
+			const clearBtn = document.createElement('button');
+			clearBtn.className = `${buttonSize} text-gray-500 hover:text-gray-700 ml-3`;
+			clearBtn.textContent = 'Sin puntuar';
+			clearBtn.addEventListener('click', function() {
+				saveRating(beerId, 0, container, starSize);
+			});
+			container.appendChild(clearBtn);
+		}
+	}
+	
+	function highlightStars(container, rating, starSize) {
+		const stars = container.querySelectorAll('.star');
+		stars.forEach((star, index) => {
+			if (index < rating) {
+				star.className = `star ${starSize} cursor-pointer transition-all text-yellow-400`;
+			} else {
+				star.className = `star ${starSize} cursor-pointer transition-all text-gray-300`;
+			}
+		});
+	}
+	
+	async function saveRating(beerId, rating, container, starSize) {
+		try {
+			const response = await fetch('/api/rating', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					beer_id: beerId,
+					rating: rating
+				})
+			});
+			
+			const data = await response.json();
+			if (data.success) {
+				// Determinar el tamaño basado en starSize
+				const size = starSize === 'text-xl' ? 'small' : 'large';
+				// Actualizar visualmente con el nuevo rating
+				createStarRating(beerId, rating, size);
+				// Mostrar mensaje de éxito mejorado
+				const successMsg = document.createElement('span');
+				successMsg.className = 'text-sm text-green-600 ml-2 font-semibold';
+				successMsg.textContent = rating > 0 ? '✓ Guardado' : '✓ Removido';
+				container.appendChild(successMsg);
+				setTimeout(() => successMsg.remove(), 2000);
+			} else {
+				alert('Error al guardar evaluación: ' + (data.error || 'Error desconocido'));
+			}
+		} catch (error) {
+			console.error('Error:', error);
+			alert('Error al guardar evaluación');
+		}
+	}
+	
+	// Inicializar estrellas cuando se carga la página
+	document.addEventListener('DOMContentLoaded', function() {
+		createStarRating('{{cerveza.beer_id}}', {{ user_rating }}, 'large');
+		{% for cerveza_rec in cervezas_recomendadas %}
+		createStarRating('{{cerveza_rec.beer_id}}', {{ user_ratings.get(cerveza_rec.beer_id, 0) }}, 'small');
+		{% endfor %}
+	});
+</script>
 
 </html>

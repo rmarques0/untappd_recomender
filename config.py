@@ -5,6 +5,8 @@ Todas las constantes y paths del sistema
 """
 
 import os
+# Última actualización del sistema (fecha estática - actualizar manualmente cuando se modifique el código)
+LAST_UPDATE_DATE = "10 de noviembre de 2025"
 
 # Directorio base del proyecto
 BASE_DIR = os.path.dirname(__file__)
