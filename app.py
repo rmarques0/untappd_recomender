@@ -321,6 +321,10 @@ def get_buscar():
             if not user_id:
                 print(f"DEBUG buscar: user_id está None, no se pueden buscar ratings")
         
+        # Asegurar que user_ratings siempre sea un diccionario válido
+        if not isinstance(user_ratings, dict):
+            user_ratings = {}
+        
         conn.close()
     
     # Obtener opciones para filtros

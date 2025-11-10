@@ -200,10 +200,14 @@
 		// Función para crear componente de estrellas
 		function createStarRating(beerId, currentRating) {
 			const container = document.getElementById(`rating-${beerId}`);
-			if (!container) return;
+			if (!container) {
+				console.error(`DEBUG: No se encontró container para beerId ${beerId}`);
+				return;
+			}
 			
+			console.log(`DEBUG: Creando estrellas para ${beerId} con rating ${currentRating}`);
 			container.innerHTML = '';
-			currentRating = currentRating || 0;
+			currentRating = parseInt(currentRating) || 0;
 			
 			// Crear contenedor de estrellas
 			const starsContainer = document.createElement('div');
@@ -296,14 +300,45 @@
 		}
 		
 		// Inicializar estrellas para todas las cervezas
-		document.addEventListener('DOMContentLoaded', function() {
+		function initializeAllRatings() {
+			console.log('DEBUG: Iniciando inicialización de ratings...');
 			{% for cerveza in cervezas %}
-			const beerId = '{{cerveza.beer_id}}';
-			const rating = {{ user_ratings.get(cerveza.beer_id|string, 0) }};
-			console.log(`DEBUG: Inicializando cerveza ${beerId} con rating ${rating}`);
-			createStarRating(beerId, rating);
+			(function() {
+				const beerId = String('{{cerveza.beer_id}}');
+				const rating = {{ user_ratings.get(cerveza.beer_id|string, 0) }};
+				
+				function initRating() {
+					const container = document.getElementById(`rating-${beerId}`);
+					if (container) {
+						console.log(`DEBUG: Inicializando ${beerId} con rating ${rating}`);
+						createStarRating(beerId, rating);
+						return true;
+					}
+					return false;
+				}
+				
+				// Intentar inmediatamente
+				if (!initRating()) {
+					// Si falla, reintentar después de un delay
+					setTimeout(function() {
+						if (!initRating()) {
+							setTimeout(initRating, 300);
+						}
+					}, 100);
+				}
+			})();
 			{% endfor %}
-		});
+		}
+		
+		// Ejecutar cuando el DOM esté listo
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', initializeAllRatings);
+		} else {
+			initializeAllRatings();
+		}
+		
+		// También ejecutar después de un pequeño delay por si acaso
+		setTimeout(initializeAllRatings, 200);
 	</script>
 </body>
 
