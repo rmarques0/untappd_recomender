@@ -132,17 +132,17 @@ def recomendar_popular(user_id, cervezas_desconocidas, N=9):
     try:
         # Obtener top 30 para tener variedad y rotación
         top_k = max(30, N * 3)
-        placeholders = ','.join(['?'] * len(cervezas_desconocidas))
-        query = f"""
-            SELECT beer_id, rating, total_ratings 
-            FROM cervezas 
-            WHERE beer_id IN ({placeholders})
+    placeholders = ','.join(['?'] * len(cervezas_desconocidas))
+    query = f"""
+        SELECT beer_id, rating, total_ratings 
+        FROM cervezas 
+        WHERE beer_id IN ({placeholders})
             ORDER BY rating DESC, total_ratings DESC, beer_id ASC
             LIMIT {top_k}
-        """
+    """
         result = sql_select(query, tuple(cervezas_desconocidas))
-        cervezas_encontradas = [row["beer_id"] for row in result]
-        
+    cervezas_encontradas = [row["beer_id"] for row in result]
+    
         if len(cervezas_encontradas) <= N:
             return cervezas_encontradas
         
@@ -165,24 +165,24 @@ def recomendar_colaborativo(user_id, cervezas_relevantes, cervezas_desconocidas,
         return recomendar_popular(user_id, cervezas_desconocidas, N)
     
     try:
-        usuarios_similares = obtener_usuarios_similares(user_id, cervezas_relevantes)
-        
-        if not usuarios_similares:
-            return recomendar_popular(user_id, cervezas_desconocidas, N)
-        
-        cervezas_recomendadas = obtener_cervezas_usuarios_similares(usuarios_similares, cervezas_desconocidas, N)
-        
-        if len(cervezas_recomendadas) < N:
+    usuarios_similares = obtener_usuarios_similares(user_id, cervezas_relevantes)
+    
+    if not usuarios_similares:
+        return recomendar_popular(user_id, cervezas_desconocidas, N)
+    
+    cervezas_recomendadas = obtener_cervezas_usuarios_similares(usuarios_similares, cervezas_desconocidas, N)
+    
+    if len(cervezas_recomendadas) < N:
             cervezas_restantes = [c for c in cervezas_desconocidas if c not in cervezas_recomendadas]
             if cervezas_restantes:
                 cervezas_populares = recomendar_popular(user_id, cervezas_restantes, N - len(cervezas_recomendadas))
                 if cervezas_populares:
-                    cervezas_recomendadas.extend(cervezas_populares)
-        
+        cervezas_recomendadas.extend(cervezas_populares)
+    
         if not cervezas_recomendadas:
             return recomendar_popular(user_id, cervezas_desconocidas, N)
         
-        return cervezas_recomendadas[:N]
+    return cervezas_recomendadas[:N]
     except Exception as e:
         print(f"Error en recomendar_colaborativo para usuario {user_id}: {e}")
         return recomendar_popular(user_id, cervezas_desconocidas, N)
