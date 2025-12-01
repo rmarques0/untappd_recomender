@@ -9,7 +9,7 @@ import numpy as np
 
 from config import DATABASE_FILE, MODEL_PATH, MAPPINGS_PATH, USER_MODELS_DIR
 from database import get_db_connection
-import utils as metricas
+from utils import normalized_discounted_cumulative_gain
 
 ###
 
@@ -126,41 +126,66 @@ def recomendar_azar(user_id, cervezas_relevantes, cervezas_desconocidas, N=9):
 
 def recomendar_popular(user_id, cervezas_desconocidas, N=9):
     """Recomendación basada en popularidad (para cold start)"""
-    if not cervezas_desconocidas:
+    if not cervezas_desconocidas or N <= 0:
         return []
     
-    # Obtener cervezas populares ordenadas por rating y cantidad de evaluaciones
-    placeholders = ','.join(['?'] * len(cervezas_desconocidas))
-    query = f"""
-        SELECT beer_id, rating, total_ratings 
-        FROM cervezas 
-        WHERE beer_id IN ({placeholders})
-        ORDER BY rating DESC, total_ratings DESC
-        LIMIT ?
-    """
-    result = sql_select(query, tuple(cervezas_desconocidas + [N]))
-    return [row["beer_id"] for row in result]
+    try:
+        # Obtener top 30 para tener variedad y rotación
+        top_k = max(30, N * 3)
+        placeholders = ','.join(['?'] * len(cervezas_desconocidas))
+        query = f"""
+            SELECT beer_id, rating, total_ratings 
+            FROM cervezas 
+            WHERE beer_id IN ({placeholders})
+            ORDER BY rating DESC, total_ratings DESC, beer_id ASC
+            LIMIT {top_k}
+        """
+        result = sql_select(query, tuple(cervezas_desconocidas))
+        cervezas_encontradas = [row["beer_id"] for row in result]
+        
+        if len(cervezas_encontradas) <= N:
+            return cervezas_encontradas
+        
+        # Usar hash del user_id para selección determinística pero variada
+        import hashlib
+        user_hash = int(hashlib.md5(str(user_id).encode()).hexdigest(), 16)
+        start_idx = user_hash % (len(cervezas_encontradas) - N + 1)
+        
+        return cervezas_encontradas[start_idx:start_idx + N]
+    except Exception as e:
+        print(f"Error en recomendar_popular para usuario {user_id}: {e}")
+        return []
 
 def recomendar_colaborativo(user_id, cervezas_relevantes, cervezas_desconocidas, N=9):
     """Recomendación basada en filtrado colaborativo"""
-    if len(cervezas_relevantes) < 3:  # Necesitamos al menos 3 evaluaciones
+    if N <= 0 or not cervezas_desconocidas:
+        return []
+    
+    if len(cervezas_relevantes) < 3:
         return recomendar_popular(user_id, cervezas_desconocidas, N)
     
-    # Obtener usuarios similares
-    usuarios_similares = obtener_usuarios_similares(user_id, cervezas_relevantes)
-    
-    if not usuarios_similares:
+    try:
+        usuarios_similares = obtener_usuarios_similares(user_id, cervezas_relevantes)
+        
+        if not usuarios_similares:
+            return recomendar_popular(user_id, cervezas_desconocidas, N)
+        
+        cervezas_recomendadas = obtener_cervezas_usuarios_similares(usuarios_similares, cervezas_desconocidas, N)
+        
+        if len(cervezas_recomendadas) < N:
+            cervezas_restantes = [c for c in cervezas_desconocidas if c not in cervezas_recomendadas]
+            if cervezas_restantes:
+                cervezas_populares = recomendar_popular(user_id, cervezas_restantes, N - len(cervezas_recomendadas))
+                if cervezas_populares:
+                    cervezas_recomendadas.extend(cervezas_populares)
+        
+        if not cervezas_recomendadas:
+            return recomendar_popular(user_id, cervezas_desconocidas, N)
+        
+        return cervezas_recomendadas[:N]
+    except Exception as e:
+        print(f"Error en recomendar_colaborativo para usuario {user_id}: {e}")
         return recomendar_popular(user_id, cervezas_desconocidas, N)
-    
-    # Obtener cervezas recomendadas por usuarios similares
-    cervezas_recomendadas = obtener_cervezas_usuarios_similares(usuarios_similares, cervezas_desconocidas, N)
-    
-    if len(cervezas_recomendadas) < N:
-        # Complementar con cervezas populares si no hay suficientes
-        cervezas_populares = recomendar_popular(user_id, cervezas_desconocidas, N - len(cervezas_recomendadas))
-        cervezas_recomendadas.extend(cervezas_populares)
-    
-    return cervezas_recomendadas[:N]
 
 def obtener_usuarios_similares(user_id, cervezas_relevantes, min_similarity=0.3, max_users=50):
     """Obtiene usuarios con gustos similares usando similitud de coseno"""
@@ -170,7 +195,7 @@ def obtener_usuarios_similares(user_id, cervezas_relevantes, min_similarity=0.3,
     # Obtener ratings del usuario actual
     user_ratings = {}
     for beer_id in cervezas_relevantes:
-        query = "SELECT rating FROM interaccion WHERE user_id = ? AND beer_id = ?"
+        query = "SELECT rating FROM ratings_historicos WHERE username = ? AND beer_id = ?"
         result = sql_select(query, [user_id, beer_id])
         if result:
             user_ratings[beer_id] = result[0]["rating"]
@@ -181,11 +206,11 @@ def obtener_usuarios_similares(user_id, cervezas_relevantes, min_similarity=0.3,
     # Buscar usuarios que hayan evaluado al menos 2 de las mismas cervezas
     placeholders = ','.join(['?'] * len(cervezas_relevantes))
     query = f"""
-        SELECT DISTINCT i1.user_id, i1.beer_id, i1.rating
-        FROM interaccion i1
-        WHERE i1.user_id != ? 
-        AND i1.beer_id IN ({placeholders})
-        AND i1.rating > 0
+        SELECT DISTINCT r.user_id as user_id, r.beer_id, r.rating
+        FROM ratings_historicos r
+        WHERE r.user_id != ? 
+        AND r.beer_id IN ({placeholders})
+        AND r.rating > 0
     """
     result = sql_select(query, tuple([user_id] + cervezas_relevantes))
     
@@ -239,12 +264,12 @@ def obtener_cervezas_usuarios_similares(usuarios_similares, cervezas_desconocida
     placeholders_beers = ','.join(['?'] * len(cervezas_desconocidas))
     
     query = f"""
-        SELECT i.beer_id, AVG(i.rating) as avg_rating, COUNT(*) as count_ratings
-        FROM interaccion i
-        WHERE i.user_id IN ({placeholders_users})
-        AND i.beer_id IN ({placeholders_beers})
-        AND i.rating > 0
-        GROUP BY i.beer_id
+        SELECT r.beer_id, AVG(r.rating) as avg_rating, COUNT(*) as count_ratings
+        FROM ratings_historicos r
+        WHERE r.user_id IN ({placeholders_users})
+        AND r.beer_id IN ({placeholders_beers})
+        AND r.rating > 0
+        GROUP BY r.beer_id
         HAVING count_ratings >= 2
         ORDER BY avg_rating DESC, count_ratings DESC
         LIMIT ?
@@ -267,7 +292,7 @@ def recomendar(user_id, cervezas_relevantes=None, cervezas_desconocidas=None, N=
     if num_evaluaciones == 0:
         # Cold start: recomendaciones populares
         resultado = recomendar_popular(user_id, cervezas_desconocidas, N)
-        return resultado, "Popular (cervezas más valoradas)"
+        return resultado, "Zero-shot (cervezas más valoradas)"
     elif num_evaluaciones < 10:
         # Few-shot: mezcla de popular y colaborativo
         popular = recomendar_popular(user_id, cervezas_desconocidas, N)
@@ -315,16 +340,114 @@ def recomendar(user_id, cervezas_relevantes=None, cervezas_desconocidas=None, N=
             resultado = recomendar_colaborativo(user_id, cervezas_relevantes, cervezas_desconocidas, N)
             return resultado, "Colaborativo (basado en usuarios similares)"
 
-def recomendar_contexto(user_id, beer_id, cervezas_relevantes=None, cervezas_desconocidas=None, N=3):
+def recomendar_contexto(user_id, beer_id, cervezas_relevantes=None, cervezas_desconocidas=None, N=6):
     """Recomendación contextual basada en una cerveza específica"""
+    # Obtener información de la cerveza actual
+    cerveza_actual = obtener_cerveza(beer_id)
+    if not cerveza_actual:
+        # Si no existe, usar recomendación normal
+        if not cervezas_relevantes:
+            cervezas_relevantes = items_valorados(user_id)
+        if not cervezas_desconocidas:
+            cervezas_desconocidas = items_desconocidos(user_id)
+        resultado, sistema = recomendar(user_id, cervezas_relevantes, cervezas_desconocidas, N)
+        # Excluir la cerveza actual si está en los resultados
+        resultado = [b for b in resultado if b != beer_id]
+        return resultado[:N], sistema
+    
+    # Obtener cervezas desconocidas excluyendo la actual
+    if not cervezas_desconocidas:
+        todas_desconocidas = items_desconocidos(user_id)
+        cervezas_desconocidas = [b for b in todas_desconocidas if b != beer_id]
+    else:
+        cervezas_desconocidas = [b for b in cervezas_desconocidas if b != beer_id]
+    
     if not cervezas_relevantes:
         cervezas_relevantes = items_valorados(user_id)
+    
+    # Buscar más cervezas similares de las que necesitamos para poder hacer shuffle
+    cervezas_similares = buscar_cervezas_similares(cerveza_actual, cervezas_desconocidas, N * 2)
+    
+    # Si encontramos suficientes similares, hacer shuffle y tomar N
+    if len(cervezas_similares) >= N:
+        random.shuffle(cervezas_similares)
+        return cervezas_similares[:N], "Similar (mismo estilo/cervecería)"
+    
+    # Si no hay suficientes similares, complementar con recomendación normal
+    resultado_normal, sistema = recomendar(user_id, cervezas_relevantes, cervezas_desconocidas, N * 2)
+    resultado_normal = [b for b in resultado_normal if b != beer_id]
+    
+    # Combinar similares con recomendación normal, evitando duplicados
+    resultado_final = cervezas_similares.copy()
+    for cerveza in resultado_normal:
+        if cerveza not in resultado_final:
+            resultado_final.append(cerveza)
+    
+    # Si aún no tenemos suficientes, buscar más similares
+    if len(resultado_final) < N:
+        cervezas_restantes = [b for b in cervezas_desconocidas if b not in resultado_final]
+        adicionales = buscar_cervezas_similares(cerveza_actual, cervezas_restantes, N - len(resultado_final))
+        resultado_final.extend(adicionales)
+    
+    # Hacer shuffle del resultado final para variar las recomendaciones
+    random.shuffle(resultado_final)
+    
+    return resultado_final[:N], f"Similar + {sistema}"
 
+def buscar_cervezas_similares(cerveza_actual, cervezas_desconocidas, N=6):
+    """Busca cervezas similares basadas en estilo y cervecería"""
     if not cervezas_desconocidas:
-        cervezas_desconocidas = items_desconocidos(user_id)
-
-    # Usar la misma lógica de transición que la recomendación general
-    return recomendar(user_id, cervezas_relevantes, cervezas_desconocidas, N)
+        return []
+    
+    style = cerveza_actual.get('style')
+    brewery_name = cerveza_actual.get('brewery_name')
+    beer_id_actual = cerveza_actual.get('beer_id')
+    
+    # Filtrar la cerveza actual
+    cervezas_desconocidas = [b for b in cervezas_desconocidas if b != beer_id_actual]
+    
+    if not cervezas_desconocidas:
+        return []
+    
+    placeholders = ','.join(['?'] * len(cervezas_desconocidas))
+    
+    # Buscar más cervezas de las necesarias para poder hacer shuffle después
+    limit = min(N * 3, len(cervezas_desconocidas))  # Buscar hasta 3x más para tener opciones
+    
+    # Buscar cervezas similares priorizando: mismo estilo + misma cervecería > mismo estilo > misma cervecería
+    query = f"""
+        SELECT beer_id, 
+               CASE 
+                   WHEN style = ? AND brewery_name = ? THEN 3
+                   WHEN style = ? THEN 2
+                   WHEN brewery_name = ? THEN 1
+                   ELSE 0
+               END as similarity_score,
+               rating, total_ratings
+        FROM cervezas 
+        WHERE beer_id IN ({placeholders})
+        AND beer_id != ?
+        ORDER BY similarity_score DESC, rating DESC, total_ratings DESC
+        LIMIT ?
+    """
+    
+    query_params = [
+        style or '', brewery_name or '',  # Para CASE WHEN (score 3)
+        style or '',  # Para CASE WHEN (score 2)
+        brewery_name or '',  # Para CASE WHEN (score 1)
+    ] + cervezas_desconocidas + [
+        beer_id_actual,  # Excluir la cerveza actual
+        limit
+    ]
+    
+    result = sql_select(query, tuple(query_params))
+    cervezas_encontradas = [row["beer_id"] for row in result]
+    
+    # Si tenemos más de N, hacer shuffle para variar
+    if len(cervezas_encontradas) > N:
+        random.shuffle(cervezas_encontradas)
+    
+    return cervezas_encontradas
 
 ###
 
@@ -406,7 +529,7 @@ def recomendar_two_tower(user_id, N=9):
     
     if not cervezas_validas:
         # Si no hay cervezas en el modelo, usar estrategia de fallback
-        print("⚠️  No hay cervezas desconocidas en el modelo, usando estrategia de fallback")
+        print("Advertencia: No hay cervezas desconocidas en el modelo, usando estrategia de fallback")
         return recomendar_colaborativo(user_id, cervezas_relevantes, cervezas_desconocidas, N)
     
     # Preparar inputs para predicción
@@ -460,7 +583,12 @@ def recomendar_two_tower(user_id, N=9):
 ###
 
 def test(user_id):
-    """Función de test para evaluar recomendaciones"""
+    """
+    Función de test para evaluar recomendaciones.
+    
+    Normaliza los ratings reales a la escala 0-1 (1-5 → 0-1) antes de calcular
+    NDCG para mantener consistencia con evaluar.py y con las métricas del reporte.
+    """
     cervezas_relevantes = items_valorados(user_id)
     cervezas_desconocidas = items_vistos(user_id) + items_desconocidos(user_id)
 
@@ -483,9 +611,10 @@ def test(user_id):
             rating = result[0]["rating"]
         else:
             rating = 0
-        relevance_scores.append(rating)
+        normalized_rating = (rating - 1) / 4.0 if rating and rating > 0 else 0.0
+        relevance_scores.append(normalized_rating)
     
-    score = metricas.normalized_discounted_cumulative_gain(relevance_scores)
+    score = normalized_discounted_cumulative_gain(relevance_scores)
     return score
 
 if __name__ == '__main__':

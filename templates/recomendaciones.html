@@ -67,11 +67,9 @@
 				<strong>Progreso:</strong> {{ cant_vistas }} vistas, {{ cant_valoradas }} valoradas
 			</div>
 			<div class="flex flex-col items-end gap-1">
-				{% if cant_valoradas > 0 %}
 				<div class="text-sm text-amber-600">
 					<strong>Sistema de recomendación:</strong> {{ sistema_usado }}
 				</div>
-				{% endif %}
 				<div class="text-xs text-gray-500">
 					Última actualización: {{ last_update_date }}
 				</div>

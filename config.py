@@ -6,7 +6,7 @@ Todas las constantes y paths del sistema
 
 import os
 # Última actualización del sistema (fecha estática - actualizar manualmente cuando se modifique el código)
-LAST_UPDATE_DATE = "10 de noviembre de 2025"
+LAST_UPDATE_DATE = "30 de noviembre de 2025"
 
 # Directorio base del proyecto
 BASE_DIR = os.path.dirname(__file__)
@@ -24,8 +24,8 @@ TRAIN_SCRIPT = os.path.join(BASE_DIR, "train_two_tower.py")
 FINE_TUNE_SCRIPT = os.path.join(BASE_DIR, "fine_tune_user.py")
 
 # Hiperparámetros del modelo
-EMBEDDING_DIM = 32
-EPOCHS = 10
+EMBEDDING_DIM = 64  # Aumentado de 32 para mais capacidade de diferenciação
+EPOCHS = 20  # Aumentado para permitir mais aprendizado
 BATCH_SIZE = 256
 VALIDATION_SPLIT = 0.2
 

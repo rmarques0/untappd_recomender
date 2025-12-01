@@ -40,12 +40,13 @@ def preparar_datos():
     cursor = conn.cursor()
     
     # Cargar ratings históricos con features adicionales
+    # Incluir ratings >= 4 para capturar preferências do usuário
     cursor.execute("""
         SELECT r.username as user_id, r.beer_id, r.rating,
                c.style, c.brewery_id, c.abv, c.ibu
         FROM ratings_historicos r
         JOIN cervezas c ON r.beer_id = c.beer_id
-        WHERE r.rating > 0
+        WHERE r.rating >= 4
     """)
     data = cursor.fetchall()
     
@@ -89,7 +90,11 @@ def preparar_datos():
     # Preparar arrays para Keras
     user_ids = np.array([user_to_idx[row['user_id']] for row in data], dtype=np.int32)
     beer_ids = np.array([beer_to_idx[row['beer_id']] for row in data], dtype=np.int32)
-    ratings = np.array([row['rating'] / 5.0 for row in data], dtype=np.float32)  # Normalizar 0-1
+    raw_ratings = np.array([row['rating'] / 5.0 for row in data], dtype=np.float32)  # Normalizar 0-1
+    
+    # Usar ratings normalizados diretamente (sem normalização por usuário)
+    # A normalização por usuário estava causando problemas
+    ratings = raw_ratings.copy()
     
     # Features categóricas
     style_ids = np.array([style_to_idx.get(row['style'], 0) for row in data], dtype=np.int32)
@@ -143,14 +148,27 @@ def crear_modelo(n_users, n_beers, n_styles, n_breweries, embedding_dim=32):
     """
     print("\n🏗️  Creando modelo Two-Tower con múltiples features...")
     
-    # User Tower
+    # User Tower - Inicialização melhor e menos regularização para permitir diferenciação
     user_input = keras.layers.Input(shape=[1], name="user_id")
-    user_embedding = keras.layers.Embedding(n_users, embedding_dim, name="user_embedding")(user_input)
+    user_embedding = keras.layers.Embedding(
+        n_users, 
+        embedding_dim, 
+        name="user_embedding",
+        embeddings_initializer='uniform',  # Inicialização uniforme para variância inicial
+        embeddings_regularizer=keras.regularizers.l2(1e-6)  # Regularização muito mais leve
+    )(user_input)
     user_vec = keras.layers.Flatten()(user_embedding)
+    # Remover dropout dos embeddings - só nas camadas densas
     
-    # Beer Tower
+    # Beer Tower - Similar
     beer_input = keras.layers.Input(shape=[1], name="beer_id")
-    beer_embedding = keras.layers.Embedding(n_beers, embedding_dim, name="beer_embedding")(beer_input)
+    beer_embedding = keras.layers.Embedding(
+        n_beers, 
+        embedding_dim, 
+        name="beer_embedding",
+        embeddings_initializer='uniform',
+        embeddings_regularizer=keras.regularizers.l2(1e-6)
+    )(beer_input)
     beer_vec = keras.layers.Flatten()(beer_embedding)
     
     # Style Tower
@@ -167,10 +185,46 @@ def crear_modelo(n_users, n_beers, n_styles, n_breweries, embedding_dim=32):
     abv_input = keras.layers.Input(shape=[1], name="abv")
     ibu_input = keras.layers.Input(shape=[1], name="ibu")
     
-    # Ranking Network
-    concat = keras.layers.Concatenate()([user_vec, beer_vec, style_vec, brewery_vec, abv_input, ibu_input])
-    dense1 = keras.layers.Dense(128, activation='relu')(concat)
-    dense2 = keras.layers.Dense(64, activation='relu')(dense1)
+    # Arquitetura focada em personalização baseada em estilos e cervejarias
+    # Estratégia: dar mais peso a estilos/cervejarias que o usuário já gostou
+    
+    # Projeção do usuário (alta capacidade)
+    user_proj = keras.layers.Dense(embedding_dim * 2, activation='relu', name="user_proj")(user_vec)
+    user_proj2 = keras.layers.Dense(embedding_dim, activation='relu', name="user_proj2")(user_proj)
+    
+    # Projeção da cerveja
+    beer_proj = keras.layers.Dense(embedding_dim, activation='relu', name="beer_proj")(beer_vec)
+    
+    # Interação user-beer (produto elemento a elemento) - FORÇA personalização
+    interaction = keras.layers.Multiply(name="user_beer_interaction")([user_proj2, beer_proj])
+    
+    # Features de estilo e cervejaria com mais peso (para personalização)
+    style_proj = keras.layers.Dense(16, activation='relu', name="style_proj")(style_vec)
+    brewery_proj = keras.layers.Dense(16, activation='relu', name="brewery_proj")(brewery_vec)
+    
+    # Combinar: interação user-beer + user (múltiplas vezes) + estilo/cervejaria (peso alto) + outras features
+    user_repeated = keras.layers.Concatenate(name="user_repeated")([
+        user_proj2, user_proj2, user_proj2, user_proj2
+    ])
+    
+    # Features adicionais (ABV, IBU) com peso menor
+    beer_features = keras.layers.Concatenate()([abv_input, ibu_input])
+    beer_features_proj = keras.layers.Dense(4, activation='relu', name="beer_features_proj")(beer_features)
+    
+    concat = keras.layers.Concatenate()([
+        interaction,              # Interação user-beer (máxima prioridade)
+        user_repeated,            # User projection (alta prioridade)
+        user_vec,                 # User embedding original
+        style_proj,               # Style projection (peso alto para personalização)
+        brewery_proj,             # Brewery projection (peso alto para personalização)
+        beer_proj,                # Beer projection
+        beer_features_proj        # Features adicionais (peso menor)
+    ])
+    
+    # Camada densa final
+    dense1 = keras.layers.Dense(64, activation='relu', kernel_regularizer=keras.regularizers.l2(1e-5))(concat)
+    dense1 = keras.layers.Dropout(0.2)(dense1)
+    dense2 = keras.layers.Dense(32, activation='relu', kernel_regularizer=keras.regularizers.l2(1e-5))(dense1)
     output = keras.layers.Dense(1, activation='sigmoid', name="rating")(dense2)
     
     # Crear modelo
@@ -179,10 +233,11 @@ def crear_modelo(n_users, n_beers, n_styles, n_breweries, embedding_dim=32):
         outputs=output
     )
     
-    # Compilar
+    # Compilar con learning rate más alto para permitir que embeddings se diferencien
+    optimizer = keras.optimizers.Adam(learning_rate=0.01)  # Aumentado de 0.001 para 0.01
     model.compile(
         loss='mse',
-        optimizer='adam',
+        optimizer=optimizer,
         metrics=['mae']
     )
     
@@ -235,6 +290,17 @@ def entrenar_modelo(model, user_ids, beer_ids, style_ids, brewery_ids, abv_value
             verbose=1
         )
     ]
+    
+    # Mezclar datos para mejor entrenamiento
+    indices = np.arange(len(user_ids))
+    np.random.shuffle(indices)
+    user_ids = user_ids[indices]
+    beer_ids = beer_ids[indices]
+    style_ids = style_ids[indices]
+    brewery_ids = brewery_ids[indices]
+    abv_values = abv_values[indices]
+    ibu_values = ibu_values[indices]
+    ratings = ratings[indices]
     
     history = model.fit(
         [user_ids, beer_ids, style_ids, brewery_ids, abv_values, ibu_values],
