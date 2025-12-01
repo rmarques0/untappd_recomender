@@ -24,8 +24,8 @@ TRAIN_SCRIPT = os.path.join(BASE_DIR, "train_two_tower.py")
 FINE_TUNE_SCRIPT = os.path.join(BASE_DIR, "fine_tune_user.py")
 
 # Hiperparámetros del modelo
-EMBEDDING_DIM = 64  # Aumentado de 32 para mais capacidade de diferenciação
-EPOCHS = 20  # Aumentado para permitir mais aprendizado
+EMBEDDING_DIM = 64  # Aumentado de 32 para más capacidad de diferenciación
+EPOCHS = 20  # Aumentado para permitir más aprendizaje
 BATCH_SIZE = 256
 VALIDATION_SPLIT = 0.2
 

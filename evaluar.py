@@ -37,14 +37,14 @@ def evaluar_estrategia(user_id, estrategia, train_ratings, test_ratings, all_bee
     test_beer_ids = [beer_id for beer_id, _ in test_ratings]
     test_ratings_dict = {beer_id: rating for beer_id, rating in test_ratings}
     
-    # METODOLOGIA CORRETA: Incluir TODAS as cervejas não avaliadas no treino
-    # Isso simula o cenário real onde o sistema recomenda entre todos os itens desconhecidos
+    # METODOLOGÍA: Incluir TODAS las cervezas no evaluadas en el entrenamiento
+    # Esto simula el escenario real donde el sistema recomienda entre todos los items desconocidos
     cervezas_candidatas = [
         b for b in all_beers 
-        if b not in train_beer_ids  # Excluir apenas as que o usuário já avaliou no treino
+        if b not in train_beer_ids  # Excluir solo las que el usuario ya evaluó en el entrenamiento
     ]
     
-    # Garantir que test_beer_ids estão sempre incluídos
+    # Garantizar que test_beer_ids estén siempre incluidos
     for beer_id in test_beer_ids:
         if beer_id not in cervezas_candidatas:
             cervezas_candidatas.append(beer_id)
@@ -117,8 +117,8 @@ def evaluar_estrategia(user_id, estrategia, train_ratings, test_ratings, all_bee
         
         elif estrategia == 'two-tower':
             try:
-                # Two-Tower precisa que as cervejas estejam no modelo
-                # Filtrar apenas cervezas que estão no modelo
+                # Two-Tower necesita que las cervezas estén en el modelo
+                # Filtrar solo cervezas que están en el modelo
                 import pickle
                 import os
                 from config import MAPPINGS_PATH
@@ -214,7 +214,7 @@ def recomendar_two_tower_filtrado(user_id, cervezas_candidatas, N=9):
     if user_id not in user_to_idx:
         raise ValueError(f"Usuario {user_id} no está en el modelo two-tower")
     
-    # Filtrar apenas cervezas candidatas que están no modelo
+    # Filtrar solo cervezas candidatas que están en el modelo
     cervezas_validas = [b for b in cervezas_candidatas if b in beer_to_idx]
     
     if not cervezas_validas:
@@ -237,10 +237,10 @@ def recomendar_two_tower_filtrado(user_id, cervezas_candidatas, N=9):
     beer_features = {row['beer_id']: dict(row) for row in cursor.fetchall()}
     conn.close()
     
-    # Filtrar apenas cervezas que têm features
+    # Filtrar solo cervezas que tienen features
     cervezas_com_features = [b for b in cervezas_validas if b in beer_features]
     if not cervezas_com_features:
-        raise ValueError("Nenhuma cerveza válida tem features no banco")
+        raise ValueError("Ninguna cerveza válida tiene features en el banco")
     
     if len(cervezas_com_features) < len(cervezas_validas):
         # Ajustar arrays para apenas cervezas com features
@@ -273,8 +273,8 @@ def recomendar_two_tower_filtrado(user_id, cervezas_candidatas, N=9):
         abv_values, ibu_values
     ], verbose=0).flatten()
     
-    # Personalización: boost baseado em histórico do usuário
-    # Obter estilos e cervejarias que o usuário já gostou (rating >= 4)
+    # Personalización: boost basado en historial del usuario
+    # Obtener estilos y cervecerías que el usuario ya le gustaron (rating >= 4)
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -430,9 +430,9 @@ def evaluar_estrategias(n_usuarios=500, k=10, test_ratio=0.2):
     """)
     all_ratings = cursor.fetchall()
     
-    # CORREÇÃO: Usar apenas cervezas que têm ratings (não todas as 12420)
-    # Das 12420 cervezas, apenas 2254 têm ratings (18%)
-    # Usar todas as 12420 como candidatas é irrealista e dilui as métricas
+    # CORRECCIÓN: Usar solo cervezas que tienen ratings (no todas las 12420)
+    # De las 12420 cervezas, solo 2254 tienen ratings (18%)
+    # Usar todas las 12420 como candidatas es irrealista y diluye las métricas
     cursor.execute("SELECT DISTINCT beer_id FROM ratings_historicos WHERE rating > 0")
     all_beers = [row['beer_id'] for row in cursor.fetchall()]
     conn.close()
@@ -450,34 +450,34 @@ def evaluar_estrategias(n_usuarios=500, k=10, test_ratio=0.2):
         ratings_por_usuario[user_id].append((row['beer_id'], row['rating'], date_val))
     
     # Filtrar usuarios con >=20 ratings para ter split mais robusto
-    # Com >=10, o test tem apenas 2 cervezas em média, o que é muito pouco
+    # Con >=10, el test tiene solo 2 cervezas en promedio, lo cual es muy poco
     # Com >=20, o test tem ~4 cervezas, ainda pouco mas mais realista
     min_ratings = 20  # Aumentar para ter mais dados no test
     usuarios_validos = {uid: ratings for uid, ratings in ratings_por_usuario.items() if len(ratings) >= min_ratings}
     
-    # Split 80/20 por usuario - CORRIGIDO: Split por cerveza única, não por rating
-    # Isso evita que a mesma cerveza apareça em train e test
+    # Split 80/20 por usuario - CORREGIDO: Split por cerveza única, no por rating
+    # Esto evita que la misma cerveza aparezca en train y test
     train_data_global = {}
     test_data_global = {}
     
     for user_id, ratings in usuarios_validos.items():
-        # Agrupar por cerveza única com timestamps para split temporal
+        # Agrupar por cerveza única con timestamps para split temporal
         beer_ratings = {}
         for beer_id, rating, date in ratings:
             if beer_id not in beer_ratings:
                 beer_ratings[beer_id] = []
             beer_ratings[beer_id].append((rating, date))
         
-        # Para cada cerveza, usar rating médio e data mais recente
+        # Para cada cerveza, usar rating medio y fecha más reciente
         unique_beer_ratings = []
         for beer_id, rating_dates in beer_ratings.items():
             avg_rating = sum(r for r, _ in rating_dates) / len(rating_dates)
-            # Pegar data mais recente (ou None se não houver)
+            # Obtener fecha más reciente (o None si no hay)
             latest_date = max((d for _, d in rating_dates if d), default=None)
             unique_beer_ratings.append((beer_id, avg_rating, latest_date))
         
         # Split TEMPORAL: ordenar por data e usar os mais recentes como test
-        # Se não houver datas, usar split aleatório como fallback
+        # Si no hay fechas, usar split aleatorio como fallback
         if any(d for _, _, d in unique_beer_ratings if d):
             # Ordenar por data (mais antigas primeiro)
             unique_beer_ratings.sort(key=lambda x: x[2] if x[2] else '')
@@ -485,7 +485,7 @@ def evaluar_estrategias(n_usuarios=500, k=10, test_ratio=0.2):
             train_data_global[user_id] = [(b, r) for b, r, _ in unique_beer_ratings[:split_idx]]
             test_data_global[user_id] = [(b, r) for b, r, _ in unique_beer_ratings[split_idx:]]
         else:
-            # Fallback: split aleatório se não houver datas
+            # Fallback: split aleatorio si no hay fechas
             random.shuffle(unique_beer_ratings)
             split_idx = int(len(unique_beer_ratings) * (1 - test_ratio))
             train_data_global[user_id] = [(b, r) for b, r, _ in unique_beer_ratings[:split_idx]]
@@ -494,10 +494,10 @@ def evaluar_estrategias(n_usuarios=500, k=10, test_ratio=0.2):
     print(f"   ✓ {len(usuarios_validos)} usuarios con >={min_ratings} ratings")
     print(f"   ✓ Split: {len(train_data_global)} usuarios en treino, {len(test_data_global)} en teste")
     
-    # Estatísticas do split
+    # Estadísticas del split
     avg_train = sum(len(ratings) for ratings in train_data_global.values()) / len(train_data_global) if train_data_global else 0
     avg_test = sum(len(ratings) for ratings in test_data_global.values()) / len(test_data_global) if test_data_global else 0
-    print(f"   ✓ Média: {avg_train:.1f} cervezas no train, {avg_test:.1f} no test por usuário")
+    print(f"   ✓ Promedio: {avg_train:.1f} cervezas en train, {avg_test:.1f} en test por usuario")
     
     # Seleccionar usuarios de teste
     test_users = list(test_data_global.keys())[:n_usuarios]
@@ -556,7 +556,7 @@ def evaluar_estrategias(n_usuarios=500, k=10, test_ratio=0.2):
     
     print(f"\n✅ Evaluación completa: {len(test_users)} usuarios")
     
-    # Diagnóstico: Verificar cobertura do modelo Two-Tower
+    # Diagnóstico: Verificar cobertura del modelo Two-Tower
     print("\n" + "=" * 60)
     print("DIAGNÓSTICO TWO-TOWER")
     print("=" * 60)
@@ -576,7 +576,7 @@ def evaluar_estrategias(n_usuarios=500, k=10, test_ratio=0.2):
         usuarios_in_model = 0
         usuarios_not_in_model = 0
         
-        for user_id in test_users[:100]:  # Amostra de 100 para diagnóstico
+        for user_id in test_users[:100]:  # Muestra de 100 para diagnóstico
             test_ratings = test_data_global.get(user_id, [])
             test_beer_ids = [beer_id for beer_id, _ in test_ratings]
             

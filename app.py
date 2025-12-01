@@ -447,17 +447,17 @@ def get_perfil():
 
 @app.get('/admin')
 def get_admin():
-    """Página de administração para monitorar usuários"""
+    """Página de administración para monitorear usuarios"""
     user_id = request.cookies.get('user_id')
     
-    # Verificar se é admin - apenas rmarques pode acessar
+    # Verificar si es admin - solo rmarques puede acceder
     if user_id != ADMIN_USER_ID:
         return redirect('/recomendaciones')
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Estatísticas gerais do sistema
+    # Estadísticas generales del sistema
     cursor.execute("SELECT COUNT(*) as total FROM usuarios")
     total_usuarios = cursor.fetchone()['total']
     
@@ -467,7 +467,7 @@ def get_admin():
     cursor.execute("SELECT COUNT(*) as total FROM interaccion WHERE rating = 0")
     total_vistas = cursor.fetchone()['total']
     
-    # Lista de usuários com suas estatísticas (otimizada)
+    # Lista de usuarios con sus estadísticas (optimizada)
     cursor.execute("""
         SELECT 
             user_id,
@@ -483,7 +483,7 @@ def get_admin():
     """)
     usuarios_stats = [dict(row) for row in cursor.fetchall()]
     
-    # Top cervezas más evaluadas (otimizada)
+    # Top cervezas más evaluadas (optimizada)
     cursor.execute("""
         SELECT 
             c.beer_name,
@@ -500,7 +500,7 @@ def get_admin():
     """)
     top_cervezas = [dict(row) for row in cursor.fetchall()]
     
-    # Top estilos más populares (otimizada)
+    # Top estilos más populares (optimizada)
     cursor.execute("""
         SELECT 
             c.style,
@@ -528,17 +528,17 @@ def get_admin():
 
 @app.get('/admin/usuario/<string:target_user_id>')
 def get_admin_usuario(target_user_id):
-    """Detalhes de um usuário específico para admin"""
+    """Detalles de un usuario específico para admin"""
     user_id = request.cookies.get('user_id')
     
-    # Verificar se é admin - apenas rmarques pode acessar
+    # Verificar si es admin - solo rmarques puede acceder
     if user_id != ADMIN_USER_ID:
         return redirect('/recomendaciones')
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Informações do usuário
+    # Informaciones del usuario
     cursor.execute("""
         SELECT 
             COUNT(CASE WHEN i.rating > 0 THEN 1 END) as evaluaciones,

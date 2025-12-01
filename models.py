@@ -40,7 +40,7 @@ def preparar_datos():
     cursor = conn.cursor()
     
     # Cargar ratings históricos con features adicionales
-    # Incluir ratings >= 4 para capturar preferências do usuário
+    # Incluir ratings >= 4 para capturar preferencias del usuario
     cursor.execute("""
         SELECT r.username as user_id, r.beer_id, r.rating,
                c.style, c.brewery_id, c.abv, c.ibu
@@ -92,8 +92,8 @@ def preparar_datos():
     beer_ids = np.array([beer_to_idx[row['beer_id']] for row in data], dtype=np.int32)
     raw_ratings = np.array([row['rating'] / 5.0 for row in data], dtype=np.float32)  # Normalizar 0-1
     
-    # Usar ratings normalizados diretamente (sem normalização por usuário)
-    # A normalização por usuário estava causando problemas
+    # Usar ratings normalizados directamente (sin normalización por usuario)
+    # La normalización por usuario estaba causando problemas
     ratings = raw_ratings.copy()
     
     # Features categóricas
@@ -148,17 +148,17 @@ def crear_modelo(n_users, n_beers, n_styles, n_breweries, embedding_dim=32):
     """
     print("\n🏗️  Creando modelo Two-Tower con múltiples features...")
     
-    # User Tower - Inicialização melhor e menos regularização para permitir diferenciação
+    # User Tower - Inicialización mejor y menos regularización para permitir diferenciación
     user_input = keras.layers.Input(shape=[1], name="user_id")
     user_embedding = keras.layers.Embedding(
         n_users, 
         embedding_dim, 
         name="user_embedding",
-        embeddings_initializer='uniform',  # Inicialização uniforme para variância inicial
-        embeddings_regularizer=keras.regularizers.l2(1e-6)  # Regularização muito mais leve
+        embeddings_initializer='uniform',  # Inicialización uniforme para varianza inicial
+        embeddings_regularizer=keras.regularizers.l2(1e-6)  # Regularización mucho más leve
     )(user_input)
     user_vec = keras.layers.Flatten()(user_embedding)
-    # Remover dropout dos embeddings - só nas camadas densas
+    # Remover dropout de los embeddings - solo en las capas densas
     
     # Beer Tower - Similar
     beer_input = keras.layers.Input(shape=[1], name="beer_id")
@@ -185,40 +185,40 @@ def crear_modelo(n_users, n_beers, n_styles, n_breweries, embedding_dim=32):
     abv_input = keras.layers.Input(shape=[1], name="abv")
     ibu_input = keras.layers.Input(shape=[1], name="ibu")
     
-    # Arquitetura focada em personalização baseada em estilos e cervejarias
-    # Estratégia: dar mais peso a estilos/cervejarias que o usuário já gostou
+    # Arquitectura enfocada en personalización basada en estilos y cervecerías
+    # Estrategia: dar más peso a estilos/cervecerías que el usuario ya le gustaron
     
-    # Projeção do usuário (alta capacidade)
+    # Proyección del usuario (alta capacidad)
     user_proj = keras.layers.Dense(embedding_dim * 2, activation='relu', name="user_proj")(user_vec)
     user_proj2 = keras.layers.Dense(embedding_dim, activation='relu', name="user_proj2")(user_proj)
     
-    # Projeção da cerveja
+    # Proyección de la cerveza
     beer_proj = keras.layers.Dense(embedding_dim, activation='relu', name="beer_proj")(beer_vec)
     
-    # Interação user-beer (produto elemento a elemento) - FORÇA personalização
+    # Interacción user-beer (producto elemento a elemento) - FORZA personalización
     interaction = keras.layers.Multiply(name="user_beer_interaction")([user_proj2, beer_proj])
     
-    # Features de estilo e cervejaria com mais peso (para personalização)
+    # Features de estilo y cervecería con más peso (para personalización)
     style_proj = keras.layers.Dense(16, activation='relu', name="style_proj")(style_vec)
     brewery_proj = keras.layers.Dense(16, activation='relu', name="brewery_proj")(brewery_vec)
     
-    # Combinar: interação user-beer + user (múltiplas vezes) + estilo/cervejaria (peso alto) + outras features
+    # Combinar: interacción user-beer + user (múltiples veces) + estilo/cervecería (peso alto) + otras features
     user_repeated = keras.layers.Concatenate(name="user_repeated")([
         user_proj2, user_proj2, user_proj2, user_proj2
     ])
     
-    # Features adicionais (ABV, IBU) com peso menor
+    # Features adicionales (ABV, IBU) con peso menor
     beer_features = keras.layers.Concatenate()([abv_input, ibu_input])
     beer_features_proj = keras.layers.Dense(4, activation='relu', name="beer_features_proj")(beer_features)
     
     concat = keras.layers.Concatenate()([
-        interaction,              # Interação user-beer (máxima prioridade)
-        user_repeated,            # User projection (alta prioridade)
+        interaction,              # Interacción user-beer (máxima prioridad)
+        user_repeated,            # User projection (alta prioridad)
         user_vec,                 # User embedding original
-        style_proj,               # Style projection (peso alto para personalização)
-        brewery_proj,             # Brewery projection (peso alto para personalização)
+        style_proj,               # Style projection (peso alto para personalización)
+        brewery_proj,             # Brewery projection (peso alto para personalización)
         beer_proj,                # Beer projection
-        beer_features_proj        # Features adicionais (peso menor)
+        beer_features_proj        # Features adicionales (peso menor)
     ])
     
     # Camada densa final
@@ -546,7 +546,7 @@ def necesita_fine_tuning(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Buscar última atualização
+    # Buscar última actualización
     cursor.execute("""
         SELECT evaluaciones_at_last_update 
         FROM model_updates 
@@ -646,7 +646,7 @@ def incrementar_contador_evaluaciones():
     conn.close()
 
 def reset_contador_evaluaciones():
-    """Resetea contador após retreinamento global"""
+    """Resetea contador después de retrenamiento global"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
